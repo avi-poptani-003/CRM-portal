@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+
+/* Base theme settings */
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+/* Ensure the app takes full height */
+html, 
+body, 
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Theme background colors */
+body {
+  background-color: rgb(243 244 246); /* bg-gray-100 */
+}
+
+body.dark {
+  background-color: rgb(17 24 39); /* bg-gray-900 */
+}
+
+/* Custom scrollbar styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgb(156 163 175); /* bg-gray-400 */
+  border-radius: 9999px;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgb(75 85 99); /* bg-gray-600 */
+}
+
+/* Theme transitions */
+* {
+  transition: background-color 200ms ease-in-out,
+              border-color 200ms ease-in-out,
+              color 200ms ease-in-out;
+}
+
