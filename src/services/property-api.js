@@ -1,17 +1,12 @@
 // Function to get a property by ID
 export const getPropertyById = async (id) => {
   try {
-    // Get the authentication token from localStorage or your auth context
-    const token = localStorage.getItem("access_token")
-
     console.log(`Fetching property with ID: ${id}`)
 
     // Add timestamp to prevent browser caching
     const timestamp = new Date().getTime()
     const response = await fetch(`/api/properties/${id}/?_t=${timestamp}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: 'include', // Include cookies in the request
     })
 
     if (!response.ok) {
@@ -30,16 +25,11 @@ export const getPropertyById = async (id) => {
 // Function to create a new property
 export const createProperty = async (formData) => {
   try {
-    // Get the authentication token from localStorage or your auth context
-    const token = localStorage.getItem("access_token")
-
-    console.log("Creating property with data:", formData)
+    // Get the authentication token from localStorage or your auth context    console.log("Creating property with data:", formData)
 
     const response = await fetch("/api/properties/", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: 'include', // Include cookies in the request
       body: formData,
     })
 

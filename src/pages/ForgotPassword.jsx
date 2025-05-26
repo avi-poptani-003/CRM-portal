@@ -23,14 +23,15 @@ const ForgotPassword = () => {
     try {
       await authService.requestPasswordReset(email);
       setIsSubmitted(true);
-      setMessage("Password reset instructions have been sent to your email.");
-    } catch {
-      // We don't want to reveal if an email exists or not for security reasons
-      // So we show the same success message regardless
-      setIsSubmitted(true);
       setMessage(
-        "If an account with that email exists, password reset instructions have been sent."
+        "If an account with that email exists, password reset instructions will be sent."
       );
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          "Unable to process your request. Please try again later."
+      );
+      setIsSubmitted(false);
     } finally {
       setIsSubmitting(false);
     }

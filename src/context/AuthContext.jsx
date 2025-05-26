@@ -13,11 +13,31 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Always try to fetch user profile (cookie-based auth)
-        try {
-          const userProfile = await authService.getUserProfile();
-          setUser(userProfile);
-        } catch (error) {
+        // Only try to get user profile if we're on a protected route
+        const publicRoutes = [
+          "/login",
+          "/register",
+          "/forgot-password",
+          "/reset-password",
+        ];
+        if (
+          !publicRoutes.some((route) =>
+            window.location.pathname.startsWith(route)
+          )
+        ) {
+          try {
+            const userProfile = await authService.getUserProfile();
+            setUser(userProfile);
+          } catch (error) {
+            // If 401 error, silently fail as user is not logged in
+            if (error.response?.status === 401) {
+              setUser(null);
+            } else {
+              setError("Failed to fetch user profile");
+            }
+          }
+        } else {
+          // On public routes, don't try to get user profile
           setUser(null);
         }
       } catch (error) {
@@ -33,17 +53,17 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     setError(null);
     try {
-      await authService.login(credentials);
-      // Fetch user profile after login
+      const loginResponse = await authService.login(credentials);
+      // Fetch user profile after successful login
       const userProfile = await authService.getUserProfile();
       setUser(userProfile);
-      return true;
+      return { success: true, role: userProfile.role };
     } catch (error) {
       setError(
         error.response?.data?.detail ||
           "Login failed. Please check your credentials."
       );
-      return false;
+      return { success: false };
     }
   };
 
