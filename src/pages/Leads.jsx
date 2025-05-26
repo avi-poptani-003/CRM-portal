@@ -1,9 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react" // Added useRef
-import { useNavigate } from "react-router-dom"
-import { useTheme } from "../context/ThemeContext"
-import { useAuth } from "../context/AuthContext"
+import { useState, useEffect, useRef } from "react"
 import {
   Search,
   Plus,
@@ -36,7 +33,50 @@ import { toast } from "react-toastify"
 import Spinner from "../components/common/Spinner"
 import LeadService from "../services/leadService"
 import UserService from "../services/UserService"
+import { useTheme } from "../context/ThemeContext"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "../context/AuthContext"
 
+const LoadingSpinner = ({ isDark, size = "md" }) => {
+  const sizes = {
+    sm: { icon: 16, text: "text-sm" },
+    md: { icon: 20, text: "text-base" },
+    lg: { icon: 24, text: "text-lg" },
+    xl: { icon: 32, text: "text-xl" }
+  };
+  
+  return (
+    <div className="flex items-center justify-center p-4">
+      <RefreshCw 
+        className={`animate-spin ${isDark ? "text-gray-400" : "text-gray-600"}`} 
+        size={sizes[size].icon} 
+      />
+      <span className={`ml-2 ${sizes[size].text} ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+        Loading...
+      </span>
+    </div>
+  );
+};
+
+const ErrorMessage = ({ error, onRetry, isDark }) => (
+  <div className={`flex flex-col items-center justify-center p-6 ${isDark ? "text-red-400" : "text-red-600"}`}>
+    <div className="flex items-center mb-4">
+      <AlertCircle className="h-6 w-6 mr-2" />
+      <span>Failed to load data</span>
+    </div>
+    <p className={`mb-4 text-sm text-center ${isDark ? "text-gray-300" : "text-gray-700"}`}>{error}</p>
+    <button
+      onClick={onRetry}
+      className={`px-4 py-2 rounded-md text-sm font-medium ${
+        isDark 
+          ? "bg-red-900/30 hover:bg-red-900/50 text-red-300" 
+          : "bg-red-100 hover:bg-red-200 text-red-700"
+      }`}
+    >
+      Retry
+    </button>
+  </div>
+);
 
 // ===== useUserRole Hook =====
 // Replace the useUserRole hook in Leads.jsx
@@ -1722,11 +1762,10 @@ function LeadDetailsDialog({ isOpen, onClose, lead, onUpdate, onDelete, users, c
 
 
 function Leads() {
-  const navigate = useNavigate()
-  const { theme } = useTheme()
-  // const { user } = useAuth() // user from useAuth is not used in this component
-  const { hasPermission } = useUserRole()
-  const isDark = theme === "dark"
+  const navigate = useNavigate();
+  const { theme } = useTheme();
+  const { hasPermission } = useUserRole();
+  const isDark = theme === "dark";
 
   // State management
   const [searchQuery, setSearchQuery] = useState("")
@@ -1737,7 +1776,7 @@ function Leads() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [leads, setLeads] = useState([])
-  const [users, setUsersState] = useState([]) // Renamed to avoid conflict with sampleUsers constant
+  const [users, setUsersState] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedLead, setSelectedLead] = useState(null)
@@ -2096,11 +2135,9 @@ const handleExportLeads = async () => {
         </header>
 
         {/* Filters Section */}
-        <div
-          className={`mb-6 p-4 rounded-lg shadow-sm border border-opacity-20 backdrop-blur-sm ${
-            isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-          }`}
-        >
+        <div className={`mb-6 p-4 rounded-lg shadow-sm border relative ${
+          isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+        }`}>
           <div className="flex flex-col md:flex-row gap-4 flex-wrap">
             <div className="flex-1 min-w-[200px]">
               <div className="relative">
@@ -2190,26 +2227,42 @@ const handleExportLeads = async () => {
               </button>
             </div>
           </div>
+
+          {loading && (
+            <div className="absolute inset-0 bg-black/5 flex items-center justify-center rounded-lg">
+              <LoadingSpinner isDark={isDark} size="sm" />
+            </div>
+          )}
         </div>
 
         {/* Leads Table */}
-        <div
-          className={`rounded-xl shadow-sm border overflow-hidden relative ${
-            isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-          }`}
-        >
-          {loading && (
-            <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10">
-              <Spinner size="lg" />
+        <div className={`rounded-xl shadow-sm border overflow-hidden relative ${
+          isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+        }`}>
+          {loading && leads.length > 0 && (
+            <div className="absolute inset-0 bg-black/5 flex items-center justify-center z-10">
+              <LoadingSpinner isDark={isDark} />
             </div>
           )}
 
-          {error && !loading && ( // Show error only if not loading
-            <div className={`p-4 text-center ${isDark ? "text-red-400" : "text-red-600"}`}>
-              {error}
-              <button onClick={() => setRefreshTrigger((prev) => prev + 1)} className="ml-2 underline">
-                Retry
-              </button>
+          {error && !loading && (
+            <ErrorMessage 
+              error={error} 
+              onRetry={() => setRefreshTrigger(prev => prev + 1)} 
+              isDark={isDark} 
+            />
+          )}
+
+          {!loading && leads.length === 0 && !error && (
+            <div className={`p-8 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+              No leads found. {hasPermission("create_leads") && (
+                <button
+                  onClick={() => setIsLeadModalOpen(true)}
+                  className={`ml-2 underline ${isDark ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-500"}`}
+                >
+                  Create your first lead
+                </button>
+              )}
             </div>
           )}
 
@@ -2357,8 +2410,8 @@ const handleExportLeads = async () => {
           </div>
 
           {/* Pagination */}
-          { totalLeads > 0 && !error && ( // Show pagination only if there are leads and no error
-            <div className={`px-6 py-4 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
+          {totalLeads > 0 && !error && (
+            <div className={`px-6 py-4 border-t relative ${isDark ? "border-gray-700" : "border-gray-200"}`}>
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                   Showing {leads.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to{" "}
