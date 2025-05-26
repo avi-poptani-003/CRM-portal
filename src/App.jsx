@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Register from "./pages/Register";
 import DashboardLayout from "./components/common/DashboardLayout"; // This includes the Navbar
 import Dashboard from "./pages/Dashboard";
@@ -27,6 +28,10 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/register" element={<Register />} />
+          <Route
+            path="/reset-password/:uid/:token"
+            element={<ResetPassword />}
+          />
         </Route>
 
         {/* Protected Routes with Navbar via DashboardLayout */}
@@ -36,9 +41,15 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/leads" element={<Leads />} />
             <Route path="/dashboard/properties" element={<Properties />} />
-            <Route path="/dashboard/properties/:id" element={<PropertyDetail />} />
+            <Route
+              path="/dashboard/properties/:id"
+              element={<PropertyDetail />}
+            />
             <Route path="/dashboard/properties/add" element={<AddProperty />} />
-            <Route path="/dashboard/properties/edit/:id" element={<EditProperty />} />
+            <Route
+              path="/dashboard/properties/edit/:id"
+              element={<EditProperty />}
+            />
             <Route path="/dashboard/site-visits" element={<SiteVisits />} />
             <Route path="/dashboard/team" element={<TeamManagement />} />
             <Route path="/dashboard/analytics" element={<Analytics />} />

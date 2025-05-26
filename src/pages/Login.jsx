@@ -113,7 +113,7 @@ const LoginCard = () => {
                     isDark ? "text-gray-300" : "text-black"
                   } mb-6 md:mb-8`}
                 >
-                  Welcome back User!!!
+                  Sale Sale its time to make some Sale!!!
                 </p>
 
                 {error && (
@@ -157,16 +157,6 @@ const LoginCard = () => {
                       >
                         Password
                       </label>
-                      <a
-                        href="/forgot-password"
-                        className={`text-sm ${
-                          isDark
-                            ? "text-blue-400 hover:text-blue-300"
-                            : "text-blue-600 hover:text-blue-700"
-                        }`}
-                      >
-                        Forgot Password?
-                      </a>
                     </div>
                     <input
                       type="password"
@@ -180,6 +170,16 @@ const LoginCard = () => {
                           : "bg-white border-gray-300 text-black placeholder-gray-400"
                       } rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500`}
                     />
+                    <a
+                      href="/forgot-password"
+                      className={`text-sm float-right p-3 ${
+                        isDark
+                          ? "text-blue-400 hover:text-blue-300"
+                          : "text-blue-600 hover:text-blue-700"
+                      }`}
+                    >
+                      Forgot Password?
+                    </a>
                   </div>
 
                   <button

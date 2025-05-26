@@ -11,6 +11,15 @@ const api = axios.create({
     withCredentials: true, // Send cookies with requests
 });
 
+// Create a separate instance for non-authenticated requests
+const publicApi = axios.create({
+    baseURL: API_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+    withCredentials: true, // Still need this for setting cookies on login
+});
+
 // Add a request interceptor to handle token refresh
 let isRefreshing = false;
 let failedQueue = [];
@@ -34,36 +43,25 @@ api.interceptors.response.use(
         // If error is 401 and we haven't tried to refresh yet
         if (error.response?.status === 401 && !originalRequest._retry) {
             if (isRefreshing) {
-                // If refresh is in progress, queue the request
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
                 })
-                .then(() => {
-                    return api(originalRequest);
-                })
-                .catch(err => {
-                    return Promise.reject(err);
-                });
+                    .then(() => api(originalRequest))
+                    .catch(err => Promise.reject(err));
             }
 
             originalRequest._retry = true;
             isRefreshing = true;
 
             try {
-                // Attempt to refresh token
-                const response = await api.post('/auth/token/refresh/');
+                await api.post('/auth/refresh/');
                 isRefreshing = false;
                 processQueue(null);
-                
                 return api(originalRequest);
             } catch (refreshError) {
                 isRefreshing = false;
                 processQueue(refreshError);
-                
-                // If refresh failed, redirect to login only if not already on login page
-                if (window.location.pathname !== '/login') {
-                    window.location.href = '/login';
-                }
+                window.location.href = '/login';
                 return Promise.reject(refreshError);
             }
         }
@@ -74,13 +72,13 @@ api.interceptors.response.use(
 const authService = {
     // Register new user (manager or agent)
     register: async (userData) => {
-        const response = await api.post('/auth/register/', userData);
+        const response = await publicApi.post('/auth/register/', userData);
         return response.data;
     },
 
     // Login user (tokens are set as cookies by backend)
     login: async (credentials) => {
-        const response = await api.post('/auth/login/', credentials);
+        const response = await publicApi.post('/auth/login/', credentials);
         return response.data;
     },
 
@@ -90,9 +88,9 @@ const authService = {
             await api.post('/auth/logout/');
         } catch (error) {
             console.error('Logout error:', error);
+        } finally {
+            window.location.href = '/login';
         }
-        // Force reload the page to clear any application state
-        window.location.href = '/login';
     },
 
     // Get user profile
@@ -111,7 +109,7 @@ const authService = {
     updateProfileImage: async (imageFile) => {
         const formData = new FormData();
         formData.append('profile_image', imageFile);
-        
+
         const response = await api.patch('/auth/user/', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
@@ -126,16 +124,35 @@ const authService = {
         return response.data;
     },
 
-    // Request password reset
+    // Request password reset (does not require authentication)
     requestPasswordReset: async (email) => {
-        const response = await api.post('/auth/password-reset/', { email });
+        const response = await publicApi.post('/auth/password-reset/', { email });
         return response.data;
     },
 
-    // Confirm password reset
+    // Confirm password reset (does not require authentication)
     confirmPasswordReset: async (resetData) => {
-        const response = await api.post('/auth/password-reset/confirm/', resetData);
+        const response = await publicApi.post('/auth/password-reset/confirm/', resetData);
         return response.data;
+    },
+
+    // Get list of agents only
+    getAgents: async () => {
+        try {
+            const response = await api.get('/users/', {
+                params: {
+                    role: 'agent'
+                }
+            });
+            if (!response.data) {
+                throw new Error('No data received from server');
+            }
+            const agents = Array.isArray(response.data) ? response.data : [];
+            return agents;
+        } catch (error) {
+            console.error('Error fetching agents:', error);
+            throw error;
+        }
     },
 
     // Get API instance for other services to use
