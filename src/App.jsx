@@ -16,6 +16,7 @@ import Unauthorized from "./pages/Unauthorized";
 import { ProtectedRoute, GuestRoute } from "./components/common/ProtectedRoute";
 import AddProperty from "./pages/AddProperty";
 import EditProperty from "./pages/EditProperty";
+import ChangePassword from "./pages/ChangePassword";
 
 import "./App.css";
 
@@ -54,6 +55,7 @@ function App() {
             <Route path="/dashboard/team" element={<TeamManagement />} />
             <Route path="/dashboard/analytics" element={<Analytics />} />
             <Route path="/dashboard/settings" element={<Settings />} />
+            <Route path="/dashboard/change-password" element={<ChangePassword />} />
           </Route>
         </Route>
 
