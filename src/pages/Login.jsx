@@ -113,7 +113,7 @@ const LoginCard = () => {
                     isDark ? "text-gray-300" : "text-black"
                   } mb-6 md:mb-8`}
                 >
-                  Sale Sale its time to make some Sale!!!
+                  Welcome back User
                 </p>
 
                 {error && (
