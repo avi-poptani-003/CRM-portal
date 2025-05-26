@@ -1,5 +1,10 @@
-import { useState, useMemo } from "react"
+// Dashboard.jsx
+"use client"
+
+import { useState, useMemo, useEffect } from "react"
+import propertyService from "../services/propertyService"
 import { useTheme } from "../context/ThemeContext"
+import { useLeadStats } from "../hooks/useLeadStats"
 import {
   BarChart,
   Bar,
@@ -27,11 +32,12 @@ import {
   BarChart2,
   PieChartIcon,
   Download,
-  // Filter, // Removed Filter icon as filters are being removed
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react"
 import Navbar from "../components/common/Navbar"
 
-// Data configurations - moved outside component to prevent recreation on each render
+// Static data for charts that don't have real data yet
 const revenueData = [
   { name: "Jan", revenue: 4000000, sales: 2400000 },
   { name: "Feb", revenue: 3000000, sales: 1398000 },
@@ -39,68 +45,6 @@ const revenueData = [
   { name: "Apr", revenue: 3908000, sales: 4800000 },
   { name: "May", revenue: 6800000, sales: 2900000 },
   { name: "Jun", revenue: 4500000, sales: 2500000 },
-]
-
-const customerData = [
-  { name: "Prospecting", value: 400 },
-  { name: "Proposal", value: 300 },
-  { name: "Negotiation", value: 300 },
-]
-
-const propertyTypeData = [
-  { name: "Residential", value: 65 },
-  { name: "Commercial", value: 20 },
-  { name: "Land", value: 15 },
-]
-
-const leadSourceData = [
-  { name: "Website", value: 45 },
-  { name: "Referrals", value: 25 },
-  { name: "Social Media", value: 20 },
-  { name: "Other", value: 10 },
-]
-
-const recentLeads = [
-  {
-    id: 1,
-    name: "Rahul Sharma",
-    email: "rahul.s@example.com",
-    phone: "+91 98765 43210",
-    source: "Website",
-    status: "New",
-    date: "2 hours ago",
-    propertyInterest: "Residential",
-  },
-  {
-    id: 2,
-    name: "Priya Patel",
-    email: "priya.p@example.com",
-    phone: "+91 87654 32109",
-    source: "Referral",
-    status: "Contacted",
-    date: "5 hours ago",
-    propertyInterest: "Commercial",
-  },
-  {
-    id: 3,
-    name: "Amit Kumar",
-    email: "amit.k@example.com",
-    phone: "+91 76543 21098",
-    source: "Social Media",
-    status: "Qualified",
-    date: "1 day ago",
-    propertyInterest: "Residential",
-  },
-  {
-    id: 4,
-    name: "Neha Singh",
-    email: "neha.s@example.com",
-    phone: "+91 65432 10987",
-    source: "Website",
-    status: "New",
-    date: "1 day ago",
-    propertyInterest: "Land",
-  },
 ]
 
 const upcomingVisits = [
@@ -154,7 +98,6 @@ const teamMembers = [
   },
 ]
 
-// Activity data from the dashboard.jsx file
 const activityData = [
   { date: "May 1", actions: 20 },
   { date: "May 2", actions: 35 },
@@ -164,10 +107,10 @@ const activityData = [
   { date: "May 6", actions: 60 },
 ]
 
-// Color palette - constant
+// Color palette
 const COLORS = ["#4285F4", "#34A853", "#FBBC05", "#EA4335", "#8AB4F8", "#CEEAD6", "#FDE293", "#F6AEA9"]
 
-// Memoized utility functions
+// Utility functions
 const formatCurrency = (value) => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -176,11 +119,43 @@ const formatCurrency = (value) => {
   }).format(value)
 }
 
-// Extracted reusable components with improved theme styling
+const formatDate = (dateString) => {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffTime = Math.abs(now - date)
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 1) return "1 day ago"
+  if (diffDays < 7) return `${diffDays} days ago`
+  if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`
+  return date.toLocaleDateString()
+}
+
+// Components
+const LoadingSpinner = ({ isDark }) => (
+  <div className="flex items-center justify-center p-8">
+    <RefreshCw className={`h-8 w-8 animate-spin ${isDark ? "text-gray-400" : "text-gray-600"}`} />
+    <span className={`ml-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>Loading...</span>
+  </div>
+)
+
+const ErrorMessage = ({ error, onRetry, isDark }) => (
+  <div className={`flex items-center justify-center p-8 ${isDark ? "text-red-400" : "text-red-600"}`}>
+    <AlertCircle className="h-6 w-6 mr-2" />
+    <span className="mr-4">Failed to load data: {error}</span>
+    <button
+      onClick={onRetry}
+      className={`px-3 py-1 rounded text-sm ${
+        isDark ? "bg-red-900/30 hover:bg-red-900/50 text-red-300" : "bg-red-100 hover:bg-red-200 text-red-700"
+      }`}
+    >
+      Retry
+    </button>
+  </div>
+)
+
 const KPICard = ({ title, value, change, icon: Icon, color, isDark }) => {
   const isPositive = !change.includes("-")
-
-  // Using the improved styling from site-visits
   const bgColor = isDark ? `bg-${color}-900/30` : `bg-${color}-100`
   const iconColor = isDark ? `text-${color}-400` : `text-${color}-600`
   const changeColor = isPositive ? "text-green-500" : "text-red-500"
@@ -190,7 +165,6 @@ const KPICard = ({ title, value, change, icon: Icon, color, isDark }) => {
       className={`${isDark ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"} rounded-xl shadow-sm p-6 border transition-all hover:shadow-md hover:translate-y-[-2px] duration-300 hover:border-blue-400 group`}
     >
       <div className="flex items-center justify-between">
-        {/* Left side icon removed as per request */}
         <div>
           <p className={isDark ? "text-gray-300" : "text-gray-500"}>{title}</p>
           <h3
@@ -203,7 +177,7 @@ const KPICard = ({ title, value, change, icon: Icon, color, isDark }) => {
             <span className="text-xs font-medium">{change}</span>
           </div>
         </div>
-        {Icon && ( // Conditionally render the right icon container if Icon is provided
+        {Icon && (
           <div
             className={`${bgColor} p-3 rounded-full transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-100 group-hover:text-blue-600 ${isDark ? "group-hover:bg-blue-900/50" : ""}`}
           >
@@ -216,7 +190,6 @@ const KPICard = ({ title, value, change, icon: Icon, color, isDark }) => {
 }
 
 const StatusBadge = ({ status, isDark }) => {
-  // Enhanced status badge styling from site-visits
   const getStatusStyles = () => {
     if (status === "New" || status === "Confirmed") {
       return isDark ? "bg-green-900/30 text-green-300" : "bg-green-100 text-green-800"
@@ -277,6 +250,32 @@ const Dashboard = () => {
   const { theme } = useTheme()
   const isDark = theme === "dark"
   const [timeRange, setTimeRange] = useState("month")
+  const [properties, setProperties] = useState([])
+  const [propertyLoading, setPropertyLoading] = useState(true)
+  const [propertyError, setPropertyError] = useState(null)
+
+  // Fetch real lead data
+  const { stats, loading, error, refetch } = useLeadStats()
+
+  useEffect(() => {
+    const fetchPropertiesData = async () => {
+      try {
+        setPropertyLoading(true)
+        const data = await propertyService.getProperties()
+        if (Array.isArray(data)) {
+          setProperties(data)
+          setPropertyError(null)
+        } else {
+          setPropertyError("Invalid property data format received from server")
+        }
+      } catch (err) {
+        setPropertyError("Failed to load property data. Please try again later.")
+      } finally {
+        setPropertyLoading(false)
+      }
+    }
+    fetchPropertiesData()
+  }, [])
 
   const chartConfig = useMemo(
     () => ({
@@ -294,10 +293,53 @@ const Dashboard = () => {
     [isDark],
   )
 
-  // Handler for the Export Report button
+  // Transform lead status data for the pipeline chart
+  const leadPipelineData = useMemo(() => {
+    if (!stats?.status_distribution) return []
+
+    return stats.status_distribution.map((item) => ({
+      name: item.status,
+      value: item.count,
+    }))
+  }, [stats])
+
+  // Transform lead source data for the chart
+  const leadSourceData = useMemo(() => {
+    if (!stats?.source_distribution) return []
+
+    return stats.source_distribution.map((item) => ({
+      name: item.source,
+      value: item.count,
+    }))
+  }, [stats])
+
+  const propertyTypeData = useMemo(() => {
+    if (!properties || properties.length === 0) return [];
+    const counts = properties.reduce((acc, property) => {
+      const type = property.property_type.charAt(0).toUpperCase() + property.property_type.slice(1);
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
+    const total = properties.length;
+    return Object.entries(counts).map(([name, count]) => ({
+      name,
+      value: parseFloat(((count / total) * 100).toFixed(2)),
+      count: count // Add count for display if needed
+    }));
+  }, [properties]);
+
   const handleExportReport = () => {
     console.log("Exporting report...")
-    alert("Report export initiated! Check console for details. (Actual export not implemented yet)")
+    alert("Report export initiated! Check console for details.")
+  }
+
+  if (loading) {
+    return (
+      <div className={`min-h-screen ${isDark ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-900"}`}>
+        <Navbar />
+        <LoadingSpinner isDark={isDark} />
+      </div>
+    )
   }
 
   return (
@@ -313,7 +355,18 @@ const Dashboard = () => {
 
           <div className="flex gap-3">
             <button
-              onClick={handleExportReport} // Added onClick handler
+              onClick={refetch}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md ${
+                isDark
+                  ? "bg-gray-700 text-gray-300 hover:bg-gray-600 border border-gray-600"
+                  : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+              }`}
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+            <button
+              onClick={handleExportReport}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-blue-500/20"
             >
               <Download className="w-4 h-4" />
@@ -322,12 +375,42 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {error && <ErrorMessage error={error} onRetry={refetch} isDark={isDark} />}
+
         {/* KPI Cards */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <KPICard title="Total Leads" value="547" change="12.5%" icon={Users} color="blue" isDark={isDark} />
-          <KPICard title="Conversions" value="92" change="5.3%" icon={CheckCircle} color="green" isDark={isDark} />
-          <KPICard title="Site Visits" value="175" change="-2.7%" icon={Calendar} color="orange" isDark={isDark} />
-          <KPICard title="Active Properties" value="26" change="3.8%" icon={Building} color="purple" isDark={isDark} />
+          <KPICard
+            title="Total Leads"
+            value={stats?.total_leads?.toString() || "0"}
+            change="12.5%"
+            icon={Users}
+            color="blue"
+            isDark={isDark}
+          />
+          <KPICard
+            title="Conversions"
+            value={stats?.converted_leads?.toString() || "0"}
+            change={`${stats?.conversion_rate || 0}%`}
+            icon={CheckCircle}
+            color="green"
+            isDark={isDark}
+          />
+          <KPICard
+            title="New Leads"
+            value={stats?.new_leads?.toString() || "0"}
+            change="5.3%"
+            icon={Calendar}
+            color="orange"
+            isDark={isDark}
+          />
+          <KPICard
+            title="Qualified Leads"
+            value={stats?.qualified_leads?.toString() || "0"}
+            change="3.8%"
+            icon={Building}
+            color="purple"
+            isDark={isDark}
+          />
         </section>
 
         {/* Charts Section */}
@@ -339,6 +422,11 @@ const Dashboard = () => {
             isDark={isDark}
             action={<TimeRangeSelector timeRange={timeRange} setTimeRange={setTimeRange} isDark={isDark} />}
           >
+            {propertyLoading ? (
+              <LoadingSpinner isDark={isDark} />
+            ) : propertyError ? (
+              <ErrorMessage error={propertyError} onRetry={refetch} isDark={isDark} />
+            ) : (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={revenueData}>
@@ -379,9 +467,10 @@ const Dashboard = () => {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+            )}
           </ChartContainer>
 
-          {/* Customer Stage Chart */}
+          {/* Lead Pipeline Chart - Now with real data */}
           <ChartContainer
             className="md:col-span-2 lg:col-span-3"
             title="Lead Pipeline"
@@ -390,7 +479,8 @@ const Dashboard = () => {
               <button
                 className={`${isDark ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-500"} text-sm font-medium flex items-center transition-all duration-200 hover:translate-x-1 hover:bg-blue-50 hover:bg-opacity-20 p-1 rounded`}
               >
-                View All <ChevronRight className="h-4 w-4 ml-1" />
+                All Leads 
+                {/* <ChevronRight className="h-4 w-4 ml-1" /> */}
               </button>
             }
           >
@@ -398,7 +488,7 @@ const Dashboard = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={customerData}
+                    data={leadPipelineData}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -406,7 +496,7 @@ const Dashboard = () => {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {customerData.map((entry, index) => (
+                    {leadPipelineData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -414,8 +504,8 @@ const Dashboard = () => {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="grid grid-cols-3 gap-2 mt-4">
-              {customerData.map((item, index) => (
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              {leadPipelineData.map((item, index) => (
                 <div key={index} className="text-center">
                   <div className="flex items-center justify-center mb-1">
                     <div
@@ -431,7 +521,7 @@ const Dashboard = () => {
           </ChartContainer>
         </div>
 
-        {/* Activity Chart - Added from dashboard.jsx */}
+        {/* Activity Chart */}
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-6">
           <ChartContainer title="Daily Activity" isDark={isDark} className="md:col-span-4 lg:col-span-6">
             <div className="h-80">
@@ -457,7 +547,7 @@ const Dashboard = () => {
 
         {/* Recent Leads and Upcoming Visits */}
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-6">
-          {/* Recent Leads */}
+          {/* Recent Leads - Now with real data */}
           <div
             className={`${isDark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-gray-300 text-gray-900"} rounded-xl shadow-sm border h-full md:col-span-3 lg:col-span-4`}
           >
@@ -513,7 +603,7 @@ const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${isDark ? "divide-gray-600" : "divide-gray-300"}`}>
-                  {recentLeads.map((lead) => (
+                  {(stats?.recent_leads || []).map((lead) => (
                     <tr
                       key={lead.id}
                       className={`${
@@ -525,7 +615,7 @@ const Dashboard = () => {
                           {lead.name}
                         </div>
                         <div className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                          {lead.propertyInterest}
+                          {lead.company || lead.interest}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -541,7 +631,7 @@ const Dashboard = () => {
                       <td
                         className={`px-6 py-4 whitespace-nowrap text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}
                       >
-                        {lead.date}
+                        {formatDate(lead.created_at)}
                       </td>
                     </tr>
                   ))}
@@ -606,6 +696,11 @@ const Dashboard = () => {
               </div>
             }
           >
+            {propertyLoading ? (
+              <LoadingSpinner isDark={isDark} />
+            ) : propertyError ? (
+              <ErrorMessage error={propertyError} onRetry={refetch} isDark={isDark} />
+            ) : (
             <div className="grid grid-cols-2 gap-6">
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
@@ -635,15 +730,16 @@ const Dashboard = () => {
                     ></div>
                     <div className="flex justify-between w-full">
                       <span className="text-sm">{item.name}</span>
-                      <span className="text-sm font-medium">{item.value}%</span>
+                      <span className="text-sm font-medium">{item.count} ({item.value}%)</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+            )}
           </ChartContainer>
 
-          {/* Lead Sources */}
+          {/* Lead Sources - Now with real data */}
           <ChartContainer
             className="md:col-span-2 lg:col-span-3"
             title="Lead Sources"
@@ -664,12 +760,9 @@ const Dashboard = () => {
                     vertical={false}
                     stroke={chartConfig.gridStroke}
                   />
-                  <XAxis type="number" domain={[0, 100]} stroke={chartConfig.axisStroke} />
+                  <XAxis type="number" stroke={chartConfig.axisStroke} />
                   <YAxis dataKey="name" type="category" width={100} stroke={chartConfig.axisStroke} />
-                  <RechartsTooltip
-                    formatter={(value) => [`${value}%`, "Percentage"]}
-                    contentStyle={chartConfig.contentStyle}
-                  />
+                  <RechartsTooltip formatter={(value) => [value, "Count"]} contentStyle={chartConfig.contentStyle} />
                   <Bar dataKey="value" fill="#4285F4" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -677,7 +770,7 @@ const Dashboard = () => {
           </ChartContainer>
         </div>
 
-        {/* Builder Performance Section - Added from dashboard.jsx */}
+        {/* Team Performance Section */}
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-6">
           <div
             className={`${isDark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-gray-300 text-gray-900"} rounded-xl shadow-sm p-6 border h-full md:col-span-3 lg:col-span-4`}

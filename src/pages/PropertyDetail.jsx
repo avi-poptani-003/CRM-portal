@@ -800,14 +800,14 @@ const PropertyDetail = () => {
               
               {/* Contact Information */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mb-6">
-                <h3 className="font-semibold mb-4">Contact Information</h3>
+                <h3 className="font-semibold mb-4">Builder Information</h3>
                 {property.contact_name && (
                   <div className="flex items-center gap-3 mb-3">
                     <div className={`w-8 h-8 rounded-full ${isDark ? "bg-gray-700" : "bg-gray-100"} flex items-center justify-center flex-shrink-0`}>
                       <User size={16} className="text-gray-500 dark:text-gray-400" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Contact Person</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Builder Contact</p>
                       <p className="font-medium">{property.contact_name}</p>
                     </div>
                   </div>
