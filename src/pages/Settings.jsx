@@ -1,14 +1,18 @@
-
-import { useState, useEffect, useRef } from "react"
+  import { useState, useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 import { useTheme } from "../context/ThemeContext"
 import { useAuth } from "../context/AuthContext"
 import authService from "../services/authService"
 import { toast } from "react-toastify"
 import { User, Palette, Mail, Phone, Camera, Shield, Sun, Moon, Monitor, Loader2, Check } from "lucide-react"
+import { ChevronRight } from "lucide-react";
+import { formatRelativeTime } from "../utils/formatters";
+
 
 function Settings() {
   const { theme, setTheme } = useTheme()
   const { user, setUser } = useAuth()
+   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const [formData, setFormData] = useState({
     username: "",
@@ -95,6 +99,10 @@ function Settings() {
     } finally {
       setImageLoading(false)
     }
+  }
+
+   const handleChangePassword = () => {
+    navigate("/dashboard/change-password")
   }
 
   return (
@@ -243,7 +251,7 @@ function Settings() {
             </div>
 
             {/* Security Section */}
-            <div>
+            {/* <div>
               <div className="flex items-center mb-6">
                 <Shield className="w-5 h-5 mr-2 text-blue-600" />
                 <h2 className={`text-xl font-semibold ${textColor}`}>Security</h2>
@@ -259,8 +267,30 @@ function Settings() {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
 
+
+<div>
+              <div className="flex items-center mb-6">
+                <Shield className="w-5 h-5 mr-2 text-blue-600" />
+                <h2 className={`text-xl font-semibold ${textColor}`}>Security</h2>
+              </div>
+
+              <div className="space-y-6">
+                <div className={`p-4 rounded-lg border ${borderColor} ${buttonHover} cursor-pointer`} onClick={handleChangePassword}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className={`text-lg font-medium ${textColor} mb-2`}>Password</h3>
+                      <p className={secondaryText}>
+                        Last changed: {user?.password_last_changed_at ? formatRelativeTime(user.password_last_changed_at) : "Never"}
+                      </p>
+                    </div>
+                    <ChevronRight className={`w-5 h-5 ${secondaryText}`} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           {/* Theme Section (Right Side) */}
           <div className={`${bgColor} rounded-xl shadow-sm border ${borderColor} lg:w-1/3 h-fit sticky top-6`}>
             <div className="p-6  border-gray-200 dark:border-gray-700">
