@@ -158,6 +158,7 @@ const Properties = () => {
         }`}
       >
         {/* Image Section */}
+        <Link to={`/dashboard/properties/${property.id}`}>
         <div className="relative h-56 overflow-hidden group">
           <img
             src={imageUrl || "/placeholder.svg"}
@@ -169,11 +170,14 @@ const Properties = () => {
             {statusConfig.label}
           </span>
         </div>
+      </Link>
 
         {/* Content Section */}
         <div className="p-5">
           <div className="mb-4">
+            <Link to={`/dashboard/properties/${property.id}`}>
             <h3 className="text-lg font-bold mb-2 line-clamp-2">{property.title}</h3>
+            </Link>
             <p className="flex items-center text-sm text-gray-500 dark:text-gray-400 mb-2">
               <i className="fas fa-map-marker-alt mr-2"></i>
               <span className="line-clamp-1">{property.location}</span>
