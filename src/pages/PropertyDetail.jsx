@@ -20,7 +20,7 @@ const capitalizeAndFormatDisplayValue = (value) => {
   const strValue = String(value);
   if (!isNaN(parseFloat(strValue)) && isFinite(Number(strValue))) return strValue;
   if (strValue.includes('sq.ft') || strValue.includes('×') || strValue.includes('₹')) return strValue;
-  if (/\d{1,2}\s\w+\s\d{4}/.test(strValue)) return strValue; 
+  if (/\d{1,2}\s\w+\s\d{4}/.test(strValue)) return strValue;
 
   return strValue
     .replace(/_/g, ' ')
@@ -61,7 +61,7 @@ const PropertyDetail = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  
+
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true); // Initialize loading to true
   const [error, setError] = useState(null);
@@ -85,17 +85,17 @@ const PropertyDetail = () => {
     if (id && id !== 'undefined' && id !== null) {
       setLoading(true);
       setError(null);
-      setProperty(null); 
+      setProperty(null);
     } else {
       setError("Invalid property ID");
       setProperty(null);
       setLoading(false);
-      return; 
+      return;
     }
 
     const storedPropertyData = sessionStorage.getItem('lastCreatedProperty');
     const newlyCreatedPropertyData = sessionStorage.getItem('newlyCreatedProperty');
-    
+
     let dataFoundInSession = false;
 
     if (newlyCreatedPropertyData) {
@@ -108,7 +108,7 @@ const PropertyDetail = () => {
         }
       } catch (err) { console.error("Error parsing newly created property:", err); }
     }
-    
+
     if (!dataFoundInSession && storedPropertyData) {
       try {
         const parsedProperty = JSON.parse(storedPropertyData);
@@ -124,7 +124,7 @@ const PropertyDetail = () => {
       setLoading(false); // Data found in session, stop loading.
       return; // Exit effect
     }
-    
+
     // If not found in sessionStorage, fetch from API
     const fetchPropertyFromAPI = async () => {
       try {
@@ -141,10 +141,10 @@ const PropertyDetail = () => {
 
     fetchPropertyFromAPI();
 
-  }, [id, navigate]); // `Maps` is a stable function from react-router, but include if ESLint insists.
+  }, [id, navigate]);
 
 
-  const handleShare = async () => { /* ... same as before ... */ 
+  const handleShare = async () => { /* ... same as before ... */
     if (!property) return;
     const shareData = {
       title: property.title,
@@ -165,8 +165,8 @@ const PropertyDetail = () => {
     }
     setTimeout(() => setShareStatus({ show: false, message: '', type: '' }), 3000);
   };
-  
-  const handleSave = () => { /* ... same as before ... */ 
+
+  const handleSave = () => { /* ... same as before ... */
     if (!property) return;
     try {
       const savedProperties = JSON.parse(localStorage.getItem('savedProperties') || '[]');
@@ -179,7 +179,7 @@ const PropertyDetail = () => {
         const propertyToSave = {
           id: property.id, title: property.title, location: property.location, price: property.price,
           property_type: property.property_type, area: property.area, status: property.status,
-          thumbnail: property.images && property.images.length > 0 ? 
+          thumbnail: property.images && property.images.length > 0 ?
             (typeof propertyService.getImageUrl === 'function' ? propertyService.getImageUrl(property.images[0].image) : property.images[0].image) : null,
           savedAt: new Date().toISOString()
         };
@@ -194,7 +194,7 @@ const PropertyDetail = () => {
     }
     setTimeout(() => setShareStatus({ show: false, message: '', type: '' }), 3000);
   };
-  
+
   const handlePrint = async () => { /* ... same as before, ensure capitalizeAndFormatDisplayValue is used ... */
     if (!property) return;
     setPrintStatus({ loading: true, error: null });
@@ -202,12 +202,12 @@ const PropertyDetail = () => {
       const printContainer = document.createElement('div');
       printContainer.id = 'print-container';
       printContainer.style.cssText = 'width: 100%; padding: 20px; background-color: white; color: black;';
-      
+
       printContainer.innerHTML = `
         <div style="max-width: 800px; margin: 0 auto;">
           <h1 style="font-size: 24px; margin-bottom: 10px;">${property.title}</h1>
           <p style="color: #666; margin-bottom: 20px;">${property.location}</p>
-          ${property.images && property.images.length > 0 ? 
+          ${property.images && property.images.length > 0 ?
             `<div style="margin-bottom: 20px;"><img src="${typeof propertyService.getImageUrl === 'function' ? propertyService.getImageUrl(property.images[0].image) : property.images[0].image}" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px;" alt="${property.title}" /></div>` : ''}
           <div style="display: flex; justify-content: space-between; margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px;">
             <div><p style="color: #666; font-size: 14px;">Price</p><p style="font-size: 20px; font-weight: bold;">₹${formatPrice(property.price)}</p></div>
@@ -258,24 +258,32 @@ const PropertyDetail = () => {
 
   // 1. Loading State: Render this first if loading is true.
   if (loading) {
+    // The main container already correctly uses `isDark` for its background and text.
+    // The changes below are for the inner skeleton elements to explicitly use `isDark`.
+    // Ideally, Tailwind's `dark:` prefix should work if ThemeContext and Tailwind config are correct.
+    // This is a workaround for this component's skeleton if global dark mode isn't behaving.
     return (
-      <div className={`min-h-screen ${isDark ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}> {/* Ensure text color for light mode */}
+      <div className={`min-h-screen ${isDark ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}> {/* This line is correctly handling overall page background */}
         <div className="container mx-auto px-4 py-8">
           {/* Skeleton structure */}
-          <div className="h-8 w-32 bg-gray-300 dark:bg-gray-700 rounded animate-pulse mb-8"></div>
-          <div className="h-10 w-3/4 bg-gray-300 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
-          <div className="h-6 w-1/2 bg-gray-300 dark:bg-gray-700 rounded animate-pulse mb-8"></div>
+          <div className={`h-8 w-32 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded animate-pulse mb-8`}></div>
+          <div className={`h-10 w-3/4 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded animate-pulse mb-2`}></div>
+          <div className={`h-6 w-1/2 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded animate-pulse mb-8`}></div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="lg:col-span-2">
-              <div className="h-96 bg-gray-300 dark:bg-gray-700 rounded-xl animate-pulse"></div>
+              <div className={`h-96 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded-xl animate-pulse`}></div>
               <div className="grid grid-cols-5 gap-2 mt-2">
-                {[...Array(5)].map((_, i) => ( <div key={i} className="h-20 bg-gray-300 dark:bg-gray-700 rounded animate-pulse"></div> ))}
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className={`h-20 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded animate-pulse`}></div>
+                ))}
               </div>
             </div>
-            <div className="h-[500px] bg-gray-300 dark:bg-gray-700 rounded-xl animate-pulse"></div>
+            <div className={`h-[500px] ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded-xl animate-pulse`}></div>
           </div>
-          <div className="h-64 bg-gray-300 dark:bg-gray-700 rounded-xl animate-pulse mb-8"></div>
-          <div className="h-96 bg-gray-300 dark:bg-gray-700 rounded-xl animate-pulse"></div>
+
+          <div className={`h-64 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded-xl animate-pulse mb-8`}></div>
+          <div className={`h-96 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded-xl animate-pulse`}></div>
         </div>
       </div>
     );
@@ -305,7 +313,7 @@ const PropertyDetail = () => {
       <div className={`min-h-screen flex items-center justify-center ${isDark ? "bg-gray-900" : "bg-gray-50"}`}>
         <div className={`${isDark ? "bg-gray-800 text-white" : "bg-white text-gray-900"} shadow-xl rounded-xl p-8 max-w-lg mx-4`}>
           <div className="w-16 h-16 mx-auto mb-4 bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full flex items-center justify-center">
-            <Home size={32} strokeWidth={1.5}/> 
+            <Home size={32} strokeWidth={1.5}/>
           </div>
           <h2 className="text-2xl font-bold text-center mb-4">Property Not Found</h2>
           <p className="text-center mb-6 text-gray-600 dark:text-gray-300">The property you're looking for doesn't exist or has been removed.</p>
@@ -318,8 +326,9 @@ const PropertyDetail = () => {
   }
 
   // 4. Success State: Render actual property details.
-  const mainImage = property.images && property.images.length > 0 
-    ? (typeof propertyService.getImageUrl === 'function' 
+  // ... (rest of your component remains the same)
+  const mainImage = property.images && property.images.length > 0
+    ? (typeof propertyService.getImageUrl === 'function'
       ? propertyService.getImageUrl(property.images[activeImage].image)
       : property.images[activeImage].image)
     : '/placeholder.svg';
@@ -344,15 +353,15 @@ const PropertyDetail = () => {
       <div className="container mx-auto px-4 py-6 max-w-7xl">
         {shareStatus.show && (
           <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transition-all duration-300 ${
-            shareStatus.type === 'success' 
-              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+            shareStatus.type === 'success'
+              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
               : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
           }`}>
             {shareStatus.type === 'success' ? <Check size={18} className="text-green-600 dark:text-green-400" /> : <X size={18} className="text-red-600 dark:text-red-400" />}
             <span>{shareStatus.message}</span>
           </div>
         )}
-        
+
         {/* Header and Action Buttons */}
         <div className="mb-6">
           <button
@@ -406,13 +415,13 @@ const PropertyDetail = () => {
                 </div>
               )}
             </div>
-            
+
             {/* Property Overview */}
             <div className={`rounded-xl p-6 ${isDark ? "bg-gray-800" : "bg-white"} shadow-sm`}>
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><span className={`w-8 h-8 rounded-full ${isDark ? "bg-blue-900/50 text-blue-400" : "bg-blue-100 text-blue-600"} flex items-center justify-center`}><Home size={16} /></span>Property Overview</h2>
               <div className="prose dark:prose-invert max-w-none"><p className="whitespace-pre-line">{property.description}</p></div>
             </div>
-            
+
             {/* Property Details Section */}
             <div className={`rounded-xl p-6 ${isDark ? "bg-gray-800" : "bg-white"} shadow-sm`}>
               <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><span className={`w-8 h-8 rounded-full ${isDark ? "bg-blue-900/50 text-blue-400" : "bg-blue-100 text-blue-600"} flex items-center justify-center`}><Briefcase size={16} /></span>Property Details</h2>
