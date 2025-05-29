@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext"; //
 import { useTheme } from "../context/ThemeContext"; //
 import authService from "../services/authService"; //
+import { User, Mail, Search, Trash2, Users, X, AlertTriangle } from "lucide-react"; // Added icons
 
 function TeamManagement() {
   const [users, setUsers] = useState([]); //
@@ -20,76 +21,87 @@ function TeamManagement() {
   });
   const [error, setError] = useState(""); //
   const [successMessage, setSuccessMessage] = useState(""); //
-  const { user } = useAuth(); //
-  const { theme } = useTheme(); //
+  const { user: currentUser } = useAuth(); // Renamed to avoid conflict
+  const { appliedTheme } = useTheme(); // Use appliedTheme for consistency
   const [searchTerm, setSearchTerm] = useState(""); //
   const [roleFilter, setRoleFilter] = useState("All"); //
 
-  const isDark = theme === "dark"; //
+  const isDark = appliedTheme === "dark"; // Use appliedTheme
 
   useEffect(() => {
-    if (user?.role === "admin") { //
+    if (currentUser?.role === "admin") { //
       fetchUsers(); //
     }
-  }, [user]); //
+  }, [currentUser]); //
 
   const fetchUsers = async () => {
     try {
       const data = await authService.getApiInstance().get("/users/"); //
-      setUsers(data.data); //
+      setUsers(data.data); // Assume data.data is an array of user objects with profile_image
     } catch (error) {
       console.error("Error fetching users:", error); //
+      setError("Failed to load team members. Please try again later.");
     }
   };
 
   const handleChange = (e) => {
-    setFormData({ //
-      ...formData, //
-      [e.target.name]: e.target.value, //
+    setFormData({ 
+      ...formData, 
+      [e.target.name]: e.target.value, 
     });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault(); //
+    if (formData.password !== formData.password_confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setError("");
+    setSuccessMessage("");
     try {
-      await authService.getApiInstance().post("/users/", formData); //
-      setSuccessMessage("User created successfully!"); //
-      setError(""); //
-      setShowCreateModal(false); //
-      fetchUsers(); //
-      setFormData({ //
-        username: "", //
-        email: "", //
-        password: "", //
-        password_confirm: "", //
-        first_name: "", //
-        last_name: "", //
-        phone_number: "", //
-        role: "agent", //
+      await authService.getApiInstance().post("/users/", formData); 
+      setSuccessMessage("User created successfully!"); 
+      setShowCreateModal(false); 
+      fetchUsers(); 
+      setFormData({ 
+        username: "", 
+        email: "", 
+        password: "", 
+        password_confirm: "", 
+        first_name: "",
+        last_name: "", 
+        phone_number: "", 
+        role: "agent", 
       });
     } catch (err) {
-      if (err.response?.data?.username) { //
-        setError( //
-          "Username already exists. Please choose a different username."
-        );
+      if (err.response?.data) {
+        // Handle specific backend errors
+        const errors = err.response.data;
+        if (errors.username) setError(`Username: ${errors.username.join(", ")}`);
+        else if (errors.email) setError(`Email: ${errors.email.join(", ")}`);
+        else if (errors.detail) setError(errors.detail);
+        else setError("Error creating user. Please check the details and try again.");
       } else {
         setError("Error creating user. Please try again."); //
       }
     }
   };
 
-  const handleDeleteClick = (user) => {
-    setUserToDelete(user); //
+  const handleDeleteClick = (userToDeleteData) => { // Renamed parameter
+    setUserToDelete(userToDeleteData); //
     setShowDeleteModal(true); //
   };
 
   const handleDeleteConfirm = async () => {
+    if (!userToDelete) return;
+    setError("");
+    setSuccessMessage("");
     try {
       await authService //
         .getApiInstance() //
         .delete(`/auth/user/${userToDelete.id}/`); //
       setSuccessMessage("User deleted successfully!"); //
-      setError(""); //
       setShowDeleteModal(false); //
       setUserToDelete(null); //
       fetchUsers(); //
@@ -105,7 +117,7 @@ function TeamManagement() {
     setUserToDelete(null); //
   };
 
-  if (user?.role !== "admin") { //
+  if (currentUser?.role !== "admin") { //
     return (
       <div className={`p-4 ${isDark ? "text-white" : "text-gray-800"}`}>
         You don't have permission to access this page.
@@ -113,16 +125,16 @@ function TeamManagement() {
     );
   }
 
-  const filteredUsers = users.filter((user) => { //
+  const filteredUsers = users.filter((userItem) => { // Renamed parameter
     const searchMatch = //
-      user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) || //
-      user.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) || //
-      user.username?.toLowerCase().includes(searchTerm.toLowerCase()) || //
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase()); //
+      userItem.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) || //
+      userItem.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) || //
+      userItem.username?.toLowerCase().includes(searchTerm.toLowerCase()) || //
+      userItem.email?.toLowerCase().includes(searchTerm.toLowerCase()); //
 
     const roleMatch = //
       roleFilter === "All" || //
-      user.role?.toLowerCase() === roleFilter.toLowerCase(); //
+      userItem.role?.toLowerCase() === roleFilter.toLowerCase(); //
 
     return searchMatch && roleMatch; //
   });
@@ -163,7 +175,7 @@ function TeamManagement() {
       case "admin": //
         return "Administrator"; //
       default:
-        return role; //
+        return role ? role.charAt(0).toUpperCase() + role.slice(1) : "N/A"; //
     }
   };
 
@@ -183,9 +195,9 @@ function TeamManagement() {
         </h1>
         <button
           onClick={() => setShowCreateModal(true)} //
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium" //
+          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2" //
         >
-          Create New User
+          <User size={18}/> Create New User
         </button>
       </div>
 
@@ -196,27 +208,14 @@ function TeamManagement() {
             placeholder="Search team members..." //
             className={`w-full pl-12 pr-4 py-3 border rounded-lg shadow-sm transition-colors ${ //
               isDark //
-                ? "bg-gray-800 border-gray-700 text-white placeholder-gray-400" //
-                : "bg-white border-gray-300 text-gray-800 placeholder-gray-500" //
+                ? "bg-gray-800 border-gray-700 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" //
+                : "bg-white border-gray-300 text-gray-800 placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500" //
             }`}
             value={searchTerm} //
             onChange={(e) => setSearchTerm(e.target.value)} //
           />
-          <div className="absolute left-4 top-3.5 text-gray-400">
-            <svg
-              xmlns="http://www.w3.org/2000/svg" //
-              className="h-5 w-5" //
-              fill="none" //
-              viewBox="0 0 24 24" //
-              stroke="currentColor" //
-            >
-              <path
-                strokeLinecap="round" //
-                strokeLinejoin="round" //
-                strokeWidth={2} //
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" //
-              />
-            </svg>
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+            <Search size={20} />
           </div>
         </div>
 
@@ -229,7 +228,7 @@ function TeamManagement() {
             Filter by role:
           </span>
           <div className="flex space-x-2">
-            {["All", "Manager", "Agent"].map((role) => ( //
+            {["All", "Manager", "Agent", "Admin"].map((role) => ( // Added Admin
               <button
                 key={role} //
                 onClick={() => setRoleFilter(role)} //
@@ -241,7 +240,7 @@ function TeamManagement() {
                     : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200" //
                 }`}
               >
-                {role}
+                {role === "Admin" ? "Administrator" : role}
               </button>
             ))}
           </div>
@@ -249,124 +248,102 @@ function TeamManagement() {
       </div>
 
       {error && ( //
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+        <div className="mb-6 bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+          <AlertTriangle size={20} className="text-red-600" />
           {error}
         </div>
       )}
       {successMessage && ( //
-        <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+        <div className="mb-6 bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded-lg">
           {successMessage}
         </div>
       )}
 
       {/* Team Member Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredUsers.length > 0 ? ( //
-          filteredUsers.map((user) => ( //
+        {filteredUsers.length > 0 ? ( 
+          filteredUsers.map((member) => ( // Renamed to member for clarity
             <div
-              key={`${user.username}-${user.email}`} //
-              className={`relative rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border ${ //
-                isDark //
-                  ? "bg-gray-800 border-gray-700" //
-                  : "bg-white border-gray-100" //
+              key={`${member.id}-${member.username}-${member.email}`} // Use member.id for a more stable key
+              className={`relative rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out overflow-hidden border ${ //
+                isDark 
+                  ? "bg-gray-800 border-gray-700 hover:border-blue-600" 
+                  : "bg-white border-gray-200 hover:border-blue-400" 
               }`}
             >
               {/* Delete Button */}
               <button
-                onClick={() => handleDeleteClick(user)} //
-                className={`absolute top-4 right-4 z-10 p-2 rounded-full shadow-sm hover:text-red-600 transition-colors ${ //
+                onClick={() => handleDeleteClick(member)} //
+                className={`absolute top-3 right-3 z-10 p-2 rounded-full transition-colors ${ //
                   isDark //
-                    ? "bg-gray-700 text-gray-300 hover:bg-red-900" //
-                    : "bg-white text-gray-600 hover:bg-red-50" //
+                    ? "bg-gray-700/50 text-gray-400 hover:bg-red-800 hover:text-red-100" //
+                    : "bg-gray-100/50 text-gray-500 hover:bg-red-100 hover:text-red-600" //
                 }`}
                 aria-label="Delete user" //
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg" //
-                  className="h-4 w-4" //
-                  fill="none" //
-                  viewBox="0 0 24 24" //
-                  stroke="currentColor" //
-                >
-                  <path
-                    strokeLinecap="round" //
-                    strokeLinejoin="round" //
-                    strokeWidth={2} //
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" //
-                  />
-                </svg>
+                <Trash2 size={16} />
               </button>
 
               {/* Card Content */}
               <div className="p-6 text-center">
-                {/* Profile Image */}
+                {/* Profile Image or Initials */}
                 <div className="mb-4 flex justify-center">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold shadow-lg">
-                    {getInitials(user.first_name, user.last_name)}
+                  <div className={`w-30 h-30 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg overflow-hidden ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                    {member.profile_image ? (
+                      <img
+                        src={member.profile_image}
+                        alt={`${member.first_name} ${member.last_name}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to initials if image fails to load
+                          e.target.onerror = null; // prevent infinite loop
+                          e.target.outerHTML = `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 text-white text-2xl font-bold">${getInitials(member.first_name, member.last_name)}</div>`;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 text-white text-2xl font-bold">
+                        {getInitials(member.first_name, member.last_name)}
+                      </div>
+                    )}
                   </div>
                 </div>
+
                 {/* Name */}
                 <h3
-                  className={`text-xl font-bold mb-1 ${ //
+                  className={`text-xl font-semibold mb-1 truncate ${ //
                     isDark ? "text-white" : "text-gray-900" //
                   }`}
                 >
-                  {user.first_name} {user.last_name}
+                  {member.first_name || ""} {member.last_name || ""}
                 </h3>
                 {/* Role Badge */}
                 <div className="mb-4">
                   <span
                     className={`inline-block px-3 py-1 text-xs font-medium rounded-full border capitalize ${getRoleColor( //
-                      user.role //
+                      member.role //
                     )}`}
                   >
-                    {getRoleDisplayName(user.role)}
+                    {getRoleDisplayName(member.role)}
                   </span>
                 </div>
                 {/* Contact Info */}
-                <div className="space-y-3">
+                <div className="space-y-2 text-sm">
                   <div
-                    className={`flex items-center justify-center gap-2 text-sm ${ //
-                      isDark ? "text-gray-300" : "text-gray-600" //
+                    className={`flex items-center justify-center gap-2 ${ //
+                      isDark ? "text-gray-400" : "text-gray-500" //
                     }`}
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg" //
-                      className="h-4 w-4" //
-                      fill="none" //
-                      viewBox="0 0 24 24" //
-                      stroke="currentColor" //
-                    >
-                      <path
-                        strokeLinecap="round" //
-                        strokeLinejoin="round" //
-                        strokeWidth={2} //
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" //
-                      />
-                    </svg>
-                    <span className="truncate">{user.username}</span>
+                    <User size={14} />
+                    <span className="truncate">{member.username}</span>
                   </div>
 
                   <div
-                    className={`flex items-center justify-center gap-2 text-sm ${ //
-                      isDark ? "text-gray-300" : "text-gray-600" //
+                    className={`flex items-center justify-center gap-2 ${ //
+                      isDark ? "text-gray-400" : "text-gray-500" //
                     }`}
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg" //
-                      className="h-4 w-4" //
-                      fill="none" //
-                      viewBox="0 0 24 24" //
-                      stroke="currentColor" //
-                    >
-                      <path
-                        strokeLinecap="round" //
-                        strokeLinejoin="round" //
-                        strokeWidth={2} //
-                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" //
-                      />
-                    </svg>
-                    <span className="truncate">{user.email}</span>
+                    <Mail size={14} />
+                    <span className="truncate">{member.email}</span>
                   </div>
                 </div>
               </div>
@@ -375,47 +352,39 @@ function TeamManagement() {
         ) : (
           <div
             className={`col-span-full p-12 text-center rounded-2xl ${ //
-              isDark ? "bg-gray-800 text-gray-400" : "bg-white text-gray-500" //
+              isDark ? "bg-gray-800 text-gray-400" : "bg-white text-gray-500 border border-gray-200" //
             }`}
           >
             <div className="mb-4">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400" //
-                fill="none" //
-                viewBox="0 0 24 24" //
-                stroke="currentColor" //
-              >
-                <path
-                  strokeLinecap="round" //
-                  strokeLinejoin="round" //
-                  strokeWidth={2} //
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" //
-                />
-              </svg>
+              <Users
+                className="mx-auto h-16 w-16 text-gray-400 dark:text-gray-500" //
+              />
             </div>
             <h3 className="text-lg font-medium mb-2">No team members found</h3>
-            <p>Try adjusting your search or filter criteria</p>
+            <p className={`${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                {searchTerm || roleFilter !== "All" ? "Try adjusting your search or filter criteria." : "Create a new user to get started."}
+            </p>
           </div>
         )}
       </div>
 
       {/* Create User Modal */}
       {showCreateModal && ( //
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div
-            className={`relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-xl ${ //
-              isDark ? "bg-gray-800 border-gray-700" : "bg-white" //
+            className={`relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-xl border ${ //
+              isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-300" //
             }`}
           >
             {/* Modal Header */}
             <div
-              className={`px-6 py-4 border-b ${ //
-                isDark ? "border-gray-700" : "border-gray-200" //
+              className={`px-6 py-4 border-b sticky top-0 z-10 ${ //
+                isDark ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50" //
               }`}
             >
               <div className="flex justify-between items-center">
                 <h3
-                  className={`text-xl font-bold ${ //
+                  className={`text-xl font-semibold ${ //
                     isDark ? "text-white" : "text-gray-900" //
                   }`}
                 >
@@ -423,256 +392,272 @@ function TeamManagement() {
                 </h3>
                 <button
                   onClick={() => setShowCreateModal(false)} //
-                  className={`p-2 rounded-lg hover:bg-gray-100 ${ //
-                    isDark ? "text-gray-300 hover:bg-gray-700" : "text-gray-500" //
+                  className={`p-1.5 rounded-lg transition-colors ${ //
+                    isDark ? "text-gray-400 hover:bg-gray-700 hover:text-gray-200" : "text-gray-500 hover:bg-gray-200 hover:text-gray-700" //
                   }`}
                 >
-                  <svg
-                    className="h-5 w-5" //
-                    viewBox="0 0 20 20" //
-                    fill="currentColor" //
-                  >
-                    <path
-                      fillRule="evenodd" //
-                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" //
-                      clipRule="evenodd" //
-                    />
-                  </svg>
+                  <X size={20} />
                 </button>
               </div>
             </div>
 
             {/* Form Body */}
+            <form onSubmit={handleSubmit}>
             <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
                 <div>
                   <label
-                    className={`block text-sm font-semibold mb-2 ${ //
-                      isDark ? "text-gray-300" : "text-gray-700" //
+                    htmlFor="first_name"
+                    className={`block text-sm font-medium mb-1.5 ${ //
+                      isDark ? "text-gray-300" : "text-gray-600" //
                     }`}
                   >
-                    First Name
+                    First Name <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="first_name"
                     type="text" //
                     name="first_name" //
                     value={formData.first_name} //
                     onChange={handleChange} //
                     required //
-                    className={`w-full px-4 py-3 border rounded-lg transition-colors ${ //
+                    placeholder="Enter your first name"
+                    className={`w-full px-4 py-2.5 border rounded-lg transition-colors shadow-sm ${ //
                       isDark //
-                        ? "bg-gray-700 border-gray-600 text-white" //
-                        : "bg-white border-gray-300 text-gray-800" //
+                        ? "bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500" //
+                        : "bg-white border-gray-300 text-gray-800 focus:ring-blue-500 focus:border-blue-500" //
                     }`}
                   />
                 </div>
 
                 <div>
                   <label
-                    className={`block text-sm font-semibold mb-2 ${ //
-                      isDark ? "text-gray-300" : "text-gray-700" //
+                    htmlFor="last_name"
+                    className={`block text-sm font-medium mb-1.5 ${ //
+                      isDark ? "text-gray-300" : "text-gray-600" //
                     }`}
                   >
-                    Last Name
+                    Last Name <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="last_name"
                     type="text" //
                     name="last_name" //
                     value={formData.last_name} //
                     onChange={handleChange} //
                     required //
-                    className={`w-full px-4 py-3 border rounded-lg transition-colors ${ //
+                    placeholder="Enter your last name"
+                    className={`w-full px-4 py-2.5 border rounded-lg transition-colors shadow-sm ${ //
                       isDark //
-                        ? "bg-gray-700 border-gray-600 text-white" //
-                        : "bg-white border-gray-300 text-gray-800" //
+                        ? "bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500" //
+                        : "bg-white border-gray-300 text-gray-800 focus:ring-blue-500 focus:border-blue-500" //
                     }`}
                   />
                 </div>
 
                 <div>
                   <label
-                    className={`block text-sm font-semibold mb-2 ${ //
-                      isDark ? "text-gray-300" : "text-gray-700" //
+                    htmlFor="username"
+                    className={`block text-sm font-medium mb-1.5 ${ //
+                      isDark ? "text-gray-300" : "text-gray-600" //
                     }`}
                   >
-                    Username
+                    Username <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="username"
                     type="text" //
                     name="username" //
                     value={formData.username} //
                     onChange={handleChange} //
                     required //
-                    className={`w-full px-4 py-3 border rounded-lg transition-colors ${ //
+                    placeholder="Enter your username"
+                    className={`w-full px-4 py-2.5 border rounded-lg transition-colors shadow-sm ${ //
                       isDark //
-                        ? "bg-gray-700 border-gray-600 text-white" //
-                        : "bg-white border-gray-300 text-gray-800" //
+                        ? "bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500" //
+                        : "bg-white border-gray-300 text-gray-800 focus:ring-blue-500 focus:border-blue-500" //
                     }`}
                   />
                 </div>
 
                 <div>
                   <label
-                    className={`block text-sm font-semibold mb-2 ${ //
-                      isDark ? "text-gray-300" : "text-gray-700" //
+                    htmlFor="email"
+                    className={`block text-sm font-medium mb-1.5 ${ //
+                      isDark ? "text-gray-300" : "text-gray-600" //
                     }`}
                   >
-                    Email
+                    Email <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="email"
                     type="email" //
                     name="email" //
                     value={formData.email} //
                     onChange={handleChange} //
                     required //
-                    className={`w-full px-4 py-3 border rounded-lg transition-colors ${ //
+                    placeholder="Email address" //
+                    className={`w-full px-4 py-2.5 border rounded-lg transition-colors shadow-sm ${ //
                       isDark //
-                        ? "bg-gray-700 border-gray-600 text-white" //
-                        : "bg-white border-gray-300 text-gray-800" //
+                        ? "bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500" //
+                        : "bg-white border-gray-300 text-gray-800 focus:ring-blue-500 focus:border-blue-500" //
                     }`}
                   />
                 </div>
 
                 <div>
                   <label
-                    className={`block text-sm font-semibold mb-2 ${ //
-                      isDark ? "text-gray-300" : "text-gray-700" //
+                    htmlFor="phone_number"
+                    className={`block text-sm font-medium mb-1.5 ${ 
+                      isDark ? "text-gray-300" : "text-gray-600" 
                     }`}
                   >
                     Phone Number
                   </label>
                   <input
-                    type="text" //
-                    name="phone_number" //
-                    value={formData.phone_number} //
-                    onChange={handleChange} //
-                    className={`w-full px-4 py-3 border rounded-lg transition-colors ${ //
-                      isDark //
-                        ? "bg-gray-700 border-gray-600 text-white" //
-                        : "bg-white border-gray-300 text-gray-800" //
+                    type="tel" 
+                    name="phone_number"
+                    value={formData.phone_number}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      handleChange({ target: { name: 'phone_number', value } });
+                    }}
+                    pattern="[0-9]{10}"
+                    maxLength={10}
+                    placeholder="10 digit phone number"
+                    className={`w-full px-4 py-3 border rounded-lg transition-colors ${
+                      isDark
+                        ? "bg-gray-700 border-gray-600 text-white"
+                        : "bg-white border-gray-300 text-gray-800"
                     }`}
                   />
                 </div>
 
                 <div>
                   <label
-                    className={`block text-sm font-semibold mb-2 ${ //
-                      isDark ? "text-gray-300" : "text-gray-700" //
+                    htmlFor="role"
+                    className={`block text-sm font-medium mb-1.5 ${ //
+                      isDark ? "text-gray-300" : "text-gray-600" //
                     }`}
                   >
-                    Role
+                    Role <span className="text-red-500">*</span>
                   </label>
                   <select
-                    name="role" //
-                    value={formData.role} //
-                    onChange={handleChange} //
-                    className={`w-full px-4 py-3 border rounded-lg transition-colors ${ //
+                    id="role"
+                    name="role" 
+                    value={formData.role} 
+                    onChange={handleChange} 
+                    required
+                    className={`w-full px-4 py-2.5 border rounded-lg transition-colors shadow-sm appearance-none ${ //
                       isDark //
-                        ? "bg-gray-700 border-gray-600 text-white" //
-                        : "bg-white border-gray-300 text-gray-800" //
+                        ? "bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500" //
+                        : "bg-white border-gray-300 text-gray-800 focus:ring-blue-500 focus:border-blue-500" //
                     }`}
                   >
                     <option value="agent">Agent</option> 
                     <option value="manager">Manager</option> 
+                    {/* Add Admin option if needed, ensure backend supports it */}
+                    {/* <option value="admin">Administrator</option>  */}
                   </select>
                 </div>
 
                 <div>
                   <label
-                    className={`block text-sm font-semibold mb-2 ${ //
-                      isDark ? "text-gray-300" : "text-gray-700" //
+                    htmlFor="password"
+                    className={`block text-sm font-medium mb-1.5 ${ //
+                      isDark ? "text-gray-300" : "text-gray-600" //
                     }`}
                   >
-                    Password
+                    Password <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="password"
                     type="password" //
                     name="password" //
                     value={formData.password} //
                     onChange={handleChange} //
                     required //
-                    className={`w-full px-4 py-3 border rounded-lg transition-colors ${ //
+                    placeholder="Enter your password"
+                    className={`w-full px-4 py-2.5 border rounded-lg transition-colors shadow-sm ${ //
                       isDark //
-                        ? "bg-gray-700 border-gray-600 text-white" //
-                        : "bg-white border-gray-300 text-gray-800" //
+                        ? "bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500" //
+                        : "bg-white border-gray-300 text-gray-800 focus:ring-blue-500 focus:border-blue-500" //
                     }`}
                   />
                 </div>
 
                 <div>
                   <label
-                    className={`block text-sm font-semibold mb-2 ${ //
-                      isDark ? "text-gray-300" : "text-gray-700" //
+                    htmlFor="password_confirm"
+                    className={`block text-sm font-medium mb-1.5 ${ //
+                      isDark ? "text-gray-300" : "text-gray-600" //
                     }`}
                   >
-                    Confirm Password
+                    Confirm Password <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="password_confirm"
                     type="password" //
                     name="password_confirm" //
                     value={formData.password_confirm} //
                     onChange={handleChange} //
                     required //
-                    className={`w-full px-4 py-3 border rounded-lg transition-colors ${ //
+                    placeholder="Enter your password again"
+                    className={`w-full px-4 py-2.5 border rounded-lg transition-colors shadow-sm ${ //
                       isDark //
-                        ? "bg-gray-700 border-gray-600 text-white" //
-                        : "bg-white border-gray-300 text-gray-800" //
+                        ? "bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500" //
+                        : "bg-white border-gray-300 text-gray-800 focus:ring-blue-500 focus:border-blue-500" //
                     }`}
                   />
                 </div>
               </div>
+              {error && (
+                <div className="mt-4 text-sm text-red-500">
+                  {error}
+                </div>
+              )}
 
               {/* Modal Footer */}
-              <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-200">
+              <div className="flex justify-end gap-3 mt-8 pt-6 border-t">
                 <button
+                  type="button"
                   onClick={() => setShowCreateModal(false)} //
-                  className={`px-6 py-3 rounded-lg font-medium transition-colors ${ //
+                  className={`px-6 py-2.5 rounded-lg font-medium transition-colors ${ //
                     isDark //
-                      ? "bg-gray-700 text-gray-300 hover:bg-gray-600" //
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200" //
+                      ? "bg-gray-600 text-gray-200 hover:bg-gray-500" //
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300" //
                   }`}
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleSubmit} //
-                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium transition-colors" //
+                  type="submit"
+                  className="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 font-medium transition-colors" //
                 >
                   Create User
                 </button>
               </div>
             </div>
+            </form>
           </div>
         </div>
       )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && userToDelete && ( //
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div
-            className={`relative p-6 w-full max-w-md rounded-2xl shadow-xl ${ //
-              isDark ? "bg-gray-800 border-gray-700" : "bg-white" //
+            className={`relative p-6 w-full max-w-md rounded-2xl shadow-xl border ${ //
+              isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-300" //
             }`}
           >
             <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-                <svg
-                  className="h-6 w-6 text-red-600" //
-                  fill="none" //
-                  viewBox="0 0 24 24" //
-                  stroke="currentColor" //
-                >
-                  <path
-                    strokeLinecap="round" //
-                    strokeLinejoin="round" //
-                    strokeWidth={2} //
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.084 16.5c-.77.833.192 2.5 1.732 2.5z" //
-                  />
-                </svg>
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+                <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
 
               <h3
-                className={`text-lg font-bold mb-2 ${ //
+                className={`text-lg font-semibold mb-2 ${ //
                   isDark ? "text-white" : "text-gray-900" //
                 }`}
               >
@@ -680,11 +665,11 @@ function TeamManagement() {
               </h3>
 
               <p
-                className={`mb-6 ${isDark ? "text-gray-300" : "text-gray-600"}`} //
+                className={`mb-6 text-sm ${isDark ? "text-gray-300" : "text-gray-600"}`} //
               >
                 Are you sure you want to delete{" "}
                 <span className="font-semibold">
-                  {userToDelete.first_name} {userToDelete.last_name} 
+                  {userToDelete.first_name} {userToDelete.last_name}
                 </span>
                 ? This action cannot be undone.
               </p>
@@ -692,17 +677,17 @@ function TeamManagement() {
               <div className="flex justify-center gap-3">
                 <button
                   onClick={handleDeleteCancel} //
-                  className={`px-6 py-2 rounded-lg font-medium transition-colors ${ //
+                  className={`px-6 py-2.5 rounded-lg font-medium transition-colors ${ //
                     isDark //
-                      ? "bg-gray-700 text-gray-300 hover:bg-gray-600" //
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200" //
+                      ? "bg-gray-600 text-gray-200 hover:bg-gray-500" //
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300" //
                   }`}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteConfirm} //
-                  className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 font-medium transition-colors" //
+                  className="bg-red-600 text-white px-6 py-2.5 rounded-lg hover:bg-red-700 font-medium transition-colors" //
                 >
                   Delete User
                 </button>
@@ -715,4 +700,4 @@ function TeamManagement() {
   );
 }
 
-export default TeamManagement; //
+export default TeamManagement;

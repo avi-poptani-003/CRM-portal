@@ -1,44 +1,34 @@
-import api from './api'; // This now imports the instance of ApiService from api.js
+// src/services/siteVisitService.js
+import apiServiceInstance from './api'; // This is your ApiService instance
 
-// Updated URL to match potential double-nesting in Django's router setup.
-// If your Django project's main urls.py includes 'apps.site_visits.urls' at 'api/site-visits/'
-// AND your apps/site_visits/urls.py uses router.register(r'site-visits', ...),
-// then the effective path becomes 'api/site-visits/site-visits/'.
-const SITE_VISITS_URL = '/site-visits/site-visits/';
-const PROPERTIES_URL = '/properties/'; // Assuming properties are at /api/properties/
-const USERS_URL = '/accounts/users/'; // Assuming users are at /api/accounts/users/
+// Define endpoint paths *relative* to the baseURL configured in authService.js (which is http://localhost:8000/api)
+const SITE_VISITS_ENDPOINT = "/site-visits/"; // Note: No leading "/api" here
+const PROPERTIES_ENDPOINT = "/properties/";   // Note: No leading "/api" here
+const USERS_ENDPOINT = "/users/";             // Note: No leading "/api" here
 
 const siteVisitService = {
   /**
-   * Fetches all site visits from the API.
-   * @param {object} params - Optional query parameters for filtering, sorting, etc.
-   * @returns {Promise<Array>} A promise that resolves to an array of site visit objects.
-   * @throws {Error} If the API call fails.
+   * Fetches all site visits from the backend.
    */
-  getAllSiteVisits: async (params = {}) => {
+  getAllSiteVisits: async () => {
     try {
-      // Use the request method from the ApiService instance
-      const response = await api.request(SITE_VISITS_URL, { method: 'get', params });
-      return response; // api.request already returns response.data
+      return await apiServiceInstance.request(SITE_VISITS_ENDPOINT);
     } catch (error) {
-      console.error("Error fetching all site visits:", error);
+      // The error object from ApiService.request should already be an AxiosError
+      console.error("Error fetching all site visits:", error.message, error.config?.url, error.response?.data);
       throw error;
     }
   },
 
   /**
    * Fetches a single site visit by its ID.
-   * @param {number|string} id - The ID of the site visit to fetch.
-   * @returns {Promise<object>} A promise that resolves to the site visit object.
-   * @throws {Error} If the API call fails or the visit is not found.
+   * @param {number|string} id - The ID of the site visit.
    */
   getSiteVisitById: async (id) => {
     try {
-      // Use the request method from the ApiService instance
-      const response = await api.request(`${SITE_VISITS_URL}${id}/`, { method: 'get' });
-      return response; // api.request already returns response.data
+      return await apiServiceInstance.request(`${SITE_VISITS_ENDPOINT}${id}/`);
     } catch (error) {
-      console.error(`Error fetching site visit ${id}:`, error);
+      console.error(`Error fetching site visit with ID ${id}:`, error.message, error.config?.url, error.response?.data);
       throw error;
     }
   },
@@ -46,16 +36,15 @@ const siteVisitService = {
   /**
    * Creates a new site visit.
    * @param {object} visitData - The data for the new site visit.
-   * @returns {Promise<object>} A promise that resolves to the newly created site visit object.
-   * @throws {Error} If the API call fails (e.g., validation errors).
    */
   createSiteVisit: async (visitData) => {
     try {
-      // Use the request method from the ApiService instance
-      const response = await api.request(SITE_VISITS_URL, { method: 'post', body: visitData });
-      return response; // api.request already returns response.data
+      return await apiServiceInstance.request(SITE_VISITS_ENDPOINT, {
+        method: "POST",
+        body: visitData,
+      });
     } catch (error) {
-      console.error("Error creating site visit:", error);
+      console.error("Error creating site visit:", error.message, error.config?.url, error.response?.data);
       throw error;
     }
   },
@@ -63,17 +52,16 @@ const siteVisitService = {
   /**
    * Updates an existing site visit.
    * @param {number|string} id - The ID of the site visit to update.
-   * @param {object} visitData - The data to update the site visit with (can be partial).
-   * @returns {Promise<object>} A promise that resolves to the updated site visit object.
-   * @throws {Error} If the API call fails.
+   * @param {object} visitData - The data to update.
    */
   updateSiteVisit: async (id, visitData) => {
     try {
-      // Use the request method from the ApiService instance
-      const response = await api.request(`${SITE_VISITS_URL}${id}/`, { method: 'patch', body: visitData });
-      return response; // api.request already returns response.data
+      return await apiServiceInstance.request(`${SITE_VISITS_ENDPOINT}${id}/`, {
+        method: "PATCH",
+        body: visitData,
+      });
     } catch (error) {
-      console.error(`Error updating site visit ${id}:`, error);
+      console.error(`Error updating site visit with ID ${id}:`, error.message, error.config?.url, error.response?.data);
       throw error;
     }
   },
@@ -81,50 +69,38 @@ const siteVisitService = {
   /**
    * Deletes a site visit by its ID.
    * @param {number|string} id - The ID of the site visit to delete.
-   * @returns {Promise<object>} A promise that resolves when the deletion is successful.
-   * @throws {Error} If the API call fails.
    */
   deleteSiteVisit: async (id) => {
     try {
-      // Use the request method from the ApiService instance
-      const response = await api.request(`${SITE_VISITS_URL}${id}/`, { method: 'delete' });
-      return response; // api.request already returns response.data
+      return await apiServiceInstance.request(`${SITE_VISITS_ENDPOINT}${id}/`, {
+        method: "DELETE",
+      });
     } catch (error) {
-      console.error(`Error deleting site visit ${id}:`, error);
+      console.error(`Error deleting site visit with ID ${id}:`, error.message, error.config?.url, error.response?.data);
       throw error;
     }
   },
 
   /**
-   * Fetches all properties from the API.
-   * This is a placeholder and assumes a /properties/ endpoint.
-   * @param {object} params - Optional query parameters.
-   * @returns {Promise<Array>} A promise that resolves to an array of property objects.
-   * @throws {Error} If the API call fails.
+   * Fetches properties for dropdowns/listings.
    */
-  getProperties: async (params = {}) => {
+  getProperties: async () => {
     try {
-      const response = await api.request(PROPERTIES_URL, { method: 'get', params });
-      return response;
+      return await apiServiceInstance.request(PROPERTIES_ENDPOINT);
     } catch (error) {
-      console.error("Error fetching properties:", error);
+      console.error("Error fetching properties:", error.message, error.config?.url, error.response?.data);
       throw error;
     }
   },
 
   /**
-   * Fetches all users from the API.
-   * This is a placeholder and assumes an /accounts/users/ endpoint.
-   * @param {object} params - Optional query parameters.
-   * @returns {Promise<Array>} A promise that resolves to an array of user objects.
-   * @throws {Error} If the API call fails.
+   * Fetches users (clients and agents) for dropdowns/listings.
    */
-  getUsers: async (params = {}) => {
+  getUsers: async () => {
     try {
-      const response = await api.request(USERS_URL, { method: 'get', params });
-      return response;
+      return await apiServiceInstance.request(USERS_ENDPOINT);
     } catch (error) {
-      console.error("Error fetching users:", error);
+      console.error("Error fetching users:", error.message, error.config?.url, error.response?.data);
       throw error;
     }
   },

@@ -229,7 +229,11 @@ const Properties = () => {
             <div className="flex">
               <Link
                 to={`/dashboard/properties/edit/${property.id}`}
-                className="flex items-center justify-center w-10 h-10 bg-white rounded-full hover:bg-gray-100 transition-colors duration-200 mr-2 border border-gray-200"
+                className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-200 mr-2 border ${
+                  isDark
+                    ? "bg-gray-700 hover:bg-gray-600 border-gray-600"
+                    : "bg-white hover:bg-gray-100 border-gray-200"
+                }`}
                 title="Edit Property"
               >
                 <span className="text-blue-500">
@@ -238,7 +242,11 @@ const Properties = () => {
               </Link>
               <button
                 onClick={() => handleDelete(property.id)}
-                className="flex items-center justify-center w-10 h-10 bg-white rounded-full hover:bg-gray-100 transition-colors duration-200 border border-gray-200"
+                className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-200 border ${
+                  isDark
+                    ? "bg-gray-700 hover:bg-gray-600 border-gray-600"
+                    : "bg-white hover:bg-gray-100 border-gray-200"
+                }`}
                 title="Delete Property"
               >
                 <span className="text-red-500">

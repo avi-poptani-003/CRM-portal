@@ -13,7 +13,7 @@ import {
   Shield,
   Sun,
   Moon,
-  Monitor,
+  // Monitor, // Removed Monitor as System theme is removed
   Loader2,
   Check,
 } from "lucide-react";
@@ -21,7 +21,7 @@ import { ChevronRight } from "lucide-react";
 import { formatRelativeTime } from "../utils/formatters";
 
 function Settings() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, appliedTheme } = useTheme(); // Use appliedTheme
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -49,7 +49,7 @@ function Settings() {
     }
   }, [user]);
 
-  const isDark = theme === "dark";
+  const isDark = appliedTheme === "dark"; // Use appliedTheme here
   const bgColor = isDark ? "bg-gray-800" : "bg-white";
   const textColor = isDark ? "text-gray-100" : "text-gray-800";
   const borderColor = isDark ? "border-gray-700" : "border-gray-200";
@@ -70,7 +70,7 @@ function Settings() {
     e.preventDefault();
     setLoading(true);
     // Create a new object for submission that excludes username, email, and role
-    const { username, email, role, ...submittableData } = formData;
+    const { username: _username, email: _email, role: _role, ...submittableData } = formData;
     try {
       const updatedUser = await authService.updateUserProfile(submittableData); //
       setUser(updatedUser);
@@ -258,13 +258,19 @@ function Settings() {
                       <Phone
                         className={`absolute left-3 top-2.5 w-5 h-5 ${secondaryText}`}
                       />
-                      <input
+                        <input
                         type="tel"
                         name="phone_number"
                         value={formData.phone_number}
-                        onChange={handleInputChange}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          handleInputChange({ target: { name: 'phone_number', value } });
+                        }}
+                        pattern="[0-9]{10}"
+                        maxLength={10}
+                        title="Please enter exactly 10 digits"
                         className={`w-full pl-10 pr-4 py-2 rounded-lg border ${inputBg} ${inputBorder} ${textColor}`}
-                        placeholder="Enter phone number"
+                        placeholder="Enter 10-digit phone number"
                       />
                     </div>
                   </div>
@@ -355,7 +361,7 @@ function Settings() {
                 <div
                   onClick={() => setTheme("light")}
                   className={`relative rounded-lg overflow-hidden transition-all duration-200 ${
-                    theme === "light"
+                    theme === "light" || (theme === "auto" && !isDark) // Retain selection logic for 'auto' if preferred default is light
                       ? "ring-2 ring-blue-500"
                       : `border ${borderColor} hover:border-blue-400`
                   }`}
@@ -367,7 +373,7 @@ function Settings() {
                     <div className="flex-1">
                       <h3
                         className={`text-base font-medium ${
-                          theme === "light" ? "text-blue-600" : textColor
+                          theme === "light" || (theme === "auto" && !isDark) ? "text-blue-600" : textColor
                         }`}
                       >
                         Light
@@ -376,7 +382,7 @@ function Settings() {
                         Bright and clear interface
                       </p>
                     </div>
-                    {theme === "light" && (
+                    {(theme === "light" || (theme === "auto" && !isDark)) && (
                       <div className="ml-2 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                         <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       </div>
@@ -388,7 +394,7 @@ function Settings() {
                 <div
                   onClick={() => setTheme("dark")}
                   className={`relative rounded-lg overflow-hidden transition-all duration-200 ${
-                    theme === "dark"
+                    theme === "dark" || (theme === "auto" && isDark) // Retain selection logic for 'auto' if preferred default is dark
                       ? "ring-2 ring-blue-500"
                       : `border ${borderColor} hover:border-blue-400`
                   }`}
@@ -400,7 +406,7 @@ function Settings() {
                     <div className="flex-1">
                       <h3
                         className={`text-base font-medium ${
-                          theme === "dark" ? "text-blue-400" : textColor
+                          theme === "dark" || (theme === "auto" && isDark) ? "text-blue-400" : textColor
                         }`}
                       >
                         Dark
@@ -409,7 +415,7 @@ function Settings() {
                         Easy on the eyes
                       </p>
                     </div>
-                    {theme === "dark" && (
+                    {(theme === "dark" || (theme === "auto" && isDark)) && (
                       <div className="ml-2 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                         <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       </div>
@@ -417,11 +423,12 @@ function Settings() {
                   </div>
                 </div>
 
-                {/* System Theme Option */}
+                {/* System Theme Option - REMOVED */}
+                {/*
                 <div
-                  onClick={() => setTheme("system")}
+                  onClick={() => setTheme("auto")}
                   className={`relative rounded-lg overflow-hidden transition-all duration-200 ${
-                    theme === "system"
+                    theme === "auto" // Check for "auto"
                       ? "ring-2 ring-blue-500"
                       : `border ${borderColor} hover:border-blue-400`
                   }`}
@@ -433,7 +440,7 @@ function Settings() {
                     <div className="flex-1">
                       <h3
                         className={`text-base font-medium ${
-                          theme === "system"
+                          theme === "auto" // Check for "auto"
                             ? "text-blue-500 dark:text-blue-400"
                             : textColor
                         }`}
@@ -444,13 +451,14 @@ function Settings() {
                         Follows your device settings
                       </p>
                     </div>
-                    {theme === "system" && (
+                    {theme === "auto" && ( // Check for "auto"
                       <div className="ml-2 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                         <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       </div>
                     )}
                   </div>
                 </div>
+                */}
               </div>
 
               {/* Theme Preview */}
@@ -458,7 +466,8 @@ function Settings() {
                 <h3 className={`text-sm font-medium ${secondaryText} mb-3`}>
                   Preview
                 </h3>
-                <div className="grid grid-cols-3 gap-3">
+                {/* Updated to grid-cols-2 as System preview is removed */}
+                <div className="grid grid-cols-2 gap-3"> 
                   {/* Light Theme Preview */}
                   <div
                     className={`rounded-lg overflow-hidden border ${borderColor}`}
@@ -531,7 +540,8 @@ function Settings() {
                     </div>
                   </div>
 
-                  {/* System Theme Preview */}
+                  {/* System Theme Preview - REMOVED */}
+                  {/*
                   <div
                     className={`rounded-lg overflow-hidden border ${borderColor}`}
                   >
@@ -567,7 +577,6 @@ function Settings() {
                         isDark ? "bg-gray-800" : "bg-gray-50"
                       } p-2 flex`}
                     >
-                      {/* Sidebar */}
                       <div className="w-1/3 pr-1">
                         <div
                           className={`rounded p-1 mb-1 ${
@@ -586,7 +595,6 @@ function Settings() {
                           <div className="w-2 h-2 rounded-sm bg-current"></div>
                         </div>
                       </div>
-                      {/* Main Content */}
                       <div className="w-2/3 pl-1">
                         <div
                           className={`h-2 w-3/4 rounded mb-1 ${
@@ -618,6 +626,7 @@ function Settings() {
                       </div>
                     </div>
                   </div>
+                  */}
                 </div>
               </div>
             </div>

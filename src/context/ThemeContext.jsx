@@ -1,53 +1,55 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
-    // Check localStorage first
     const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) return savedTheme;
-    
-    // Check system preference
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-    return 'light';
+    // If a specific theme ('light', 'dark', or 'auto') is saved, use it.
+    // Otherwise, default to 'auto' to follow system preference initially.
+    return savedTheme || 'auto';
   });
+
+  const [appliedTheme, setAppliedTheme] = useState('light'); // Will be 'light' or 'dark'
+
+  const updateAppliedTheme = useCallback(() => {
+    let currentTheme;
+    if (theme === 'auto') {
+      currentTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } else {
+      currentTheme = theme;
+    }
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(currentTheme);
+    setAppliedTheme(currentTheme);
+  }, [theme]);
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
-    // Remove any existing theme classes
-    document.documentElement.classList.remove('light', 'dark');
-    // Add the current theme class
-    if (theme !== 'auto') {
-      document.documentElement.classList.add(theme);
-    } else {
-      // For auto theme, check system preference
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.add('light');
-      }
-    }
-  }, [theme]);
+    updateAppliedTheme();
+  }, [theme, updateAppliedTheme]);
 
-  // Listen for system theme changes when in auto mode
+  // Listen for system theme changes to update appliedTheme when in 'auto' mode
   useEffect(() => {
-    if (theme !== 'auto') return;
-
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      document.documentElement.classList.remove('light', 'dark');
-      document.documentElement.classList.add(e.matches ? 'dark' : 'light');
+    
+    const handleChange = () => {
+      if (theme === 'auto') { // Only update if current selection is 'auto'
+        updateAppliedTheme();
+      }
     };
 
     mediaQuery.addEventListener('change', handleChange);
+    // Initial check in case theme is already 'auto' from localStorage
+    if (theme === 'auto') {
+        updateAppliedTheme();
+    }
+    
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [theme]);
+  }, [theme, updateAppliedTheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, appliedTheme }}>
       {children}
     </ThemeContext.Provider>
   );

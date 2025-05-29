@@ -348,6 +348,17 @@ const PropertyDetail = () => {
     return diffDays <= 30;
   };
 
+  const handleWhatsAppRedirect = () => {
+    if (!property.contact_phone) return;
+    // Remove any non-digit characters from the phone number
+    const formattedPhone = property.contact_phone.replace(/\D/g, '');
+    // Add country code if not present (assuming Indian numbers)
+    const phoneWithCountry = formattedPhone.startsWith('91') ? formattedPhone : `91${formattedPhone}`;
+    // Create WhatsApp URL
+    const whatsappUrl = `https://wa.me/${phoneWithCountry}?text=Hi, I am interested in your property: ${property.title} at ${property.location}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   return (
     <div className={`min-h-screen ${isDark ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}> {/* Ensure text color for light mode */}
       <div className="container mx-auto px-4 py-6 max-w-7xl">
@@ -489,7 +500,13 @@ const PropertyDetail = () => {
               </div>
               {/* Action Buttons */}
               <div className="space-y-3">
-                <button className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition duration-200 flex items-center justify-center gap-2 font-medium"><Phone size={18} />Contact Seller</button>
+                <button 
+                  onClick={handleWhatsAppRedirect} 
+                  disabled={!property.contact_phone}
+                  className={`w-full py-3 ${property.contact_phone ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg transition duration-200 flex items-center justify-center gap-2 font-medium`}>
+                  <Phone size={18} />
+                  {property.contact_phone ? 'Contact on WhatsApp' : 'No contact number available'}
+                </button>
                 <button onClick={handleSave} className={`w-full py-3 border rounded-lg transition duration-200 flex items-center justify-center gap-2 font-medium ${isSaved ? (isDark ? "border-blue-500 bg-blue-900/20 text-blue-400" : "border-blue-600 bg-blue-50 text-blue-600") : (isDark ? "border-blue-600 text-blue-400 hover:bg-blue-900/20" : "border-blue-600 text-blue-600 hover:bg-blue-50")}`}><Heart size={18} fill={isSaved ? "currentColor" : "none"} />{isSaved ? "Saved to Favorites" : "Save to Favorites"}</button>
               </div>
             </div>
