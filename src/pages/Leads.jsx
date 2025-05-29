@@ -70,7 +70,7 @@ function Leads() {
   const [pageSize, setPageSize] = useState(10);
   const [totalLeads, setTotalLeads] = useState(0);
 
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Kept for potential other uses, but reset will also trigger data load
 
   const leadSources = [
     "Website",
@@ -79,7 +79,6 @@ function Leads() {
     "Referral",
     "Direct Call",
     "Email",
-    "Exhibition",
     "Other",
   ].sort();
   const leadStatuses = [
@@ -98,7 +97,7 @@ function Leads() {
   const debouncedSetSearchQuery = useCallback(
     debounce((query) => {
       setSearchQuery(query);
-      setCurrentPage(1);
+      setCurrentPage(1); // Reset page on new search
     }, 500),
     []
   );
@@ -112,8 +111,10 @@ function Leads() {
       setLoading(true);
       setError(null);
       try {
+        // Fetch users first or in parallel if not dependent on leads
         const usersResponse = await UserService.getUsers();
-        setUsersState(usersResponse.results || usersResponse || []);
+        const currentUsers = usersResponse.results || usersResponse || [];
+        setUsersState(currentUsers);
 
         const params = {
           page: currentPage,
@@ -128,7 +129,6 @@ function Leads() {
 
         const leadsResponse = await LeadService.getLeads(params);
 
-        const currentUsers = usersResponse.results || usersResponse || [];
         const transformedLeads = leadsResponse.results.map((lead) => {
           const assignedUser = currentUsers.find(
             (u) => u.id === lead.assigned_to
@@ -187,7 +187,7 @@ function Leads() {
   }, [
     currentPage,
     pageSize,
-    refreshTrigger,
+    refreshTrigger, // Keep if you have other manual refresh needs
     searchQuery,
     statusFilter,
     sourceFilter,
@@ -206,7 +206,7 @@ function Leads() {
     try {
       await LeadService.createLead(submissionData);
       setIsAddLeadModalOpen(false);
-      setRefreshTrigger((prev) => prev + 1);
+      setRefreshTrigger((prev) => prev + 1); // Refresh data after adding
       toast.success("Lead created successfully!");
     } catch (err) {
       console.error("Error creating lead:", err);
@@ -240,7 +240,7 @@ function Leads() {
       await LeadService.updateLead(submissionData.id, submissionData);
       setIsDetailsModalOpen(false);
       setSelectedLead(null);
-      setRefreshTrigger((prev) => prev + 1);
+      setRefreshTrigger((prev) => prev + 1); // Refresh data after updating
       toast.success("Lead updated successfully!");
     } catch (err) {
       console.error("Error updating lead:", err);
@@ -263,9 +263,9 @@ function Leads() {
     try {
       await LeadService.deleteLead(leadId);
       if (leads.length === 1 && currentPage > 1) {
-        setCurrentPage(currentPage - 1);
+        setCurrentPage(currentPage - 1); // Go to previous page if last item on current page is deleted
       } else {
-        setRefreshTrigger((prev) => prev + 1);
+        setRefreshTrigger((prev) => prev + 1); // Refresh data
       }
       toast.success("Lead deleted successfully.");
       setIsDetailsModalOpen(false);
@@ -286,7 +286,7 @@ function Leads() {
     try {
       const response = await LeadService.importLeads(formData);
       setIsImportModalOpen(false);
-      setRefreshTrigger((prev) => prev + 1);
+      setRefreshTrigger((prev) => prev + 1); // Refresh data after import
       toast.success(response.message || "Leads imported successfully!");
     } catch (err) {
       console.error("Error importing leads:", err);
@@ -325,6 +325,16 @@ function Leads() {
       console.error("Error exporting leads:", err);
       toast.error(err.response?.data?.detail || "Failed to export leads.");
     }
+  };
+
+  // New function to reset filters
+  const handleResetFilters = () => {
+    setSearchInput(""); // This will trigger debouncedSetSearchQuery, which sets searchQuery
+    setStatusFilter("All Statuses");
+    setSourceFilter("All Sources");
+    setAssigneeFilter("All Assignees");
+    setCurrentPage(1); // Go back to the first page
+    // No need to call setRefreshTrigger here, as changes to filter states will trigger the useEffect for data loading.
   };
 
   const getStatusBadgeClass = (status) => {
@@ -446,7 +456,7 @@ function Leads() {
         year: "numeric",
       });
     } catch (e) {
-      return dateString;
+      return dateString; // Fallback if date is invalid
     }
   };
 
@@ -456,14 +466,13 @@ function Leads() {
   const tdStyle = `px-2 py-2 sm:px-3 sm:py-3 text-xs sm:text-sm ${
     isDark ? "text-gray-300" : "text-gray-700"
   }`;
-  const buttonStyle = `px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium transition-all duration-150 flex items-center gap-1 sm:gap-1.5 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed`;
+  const buttonStyle = `px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-md text-[10px] sm:text-sm font-medium transition-all duration-150 flex items-center gap-1 sm:gap-1.5 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed`;
   const filterSelectStyle = `w-full px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-md border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
     isDark
       ? "bg-gray-700 border-gray-600 text-gray-100"
       : "bg-white border-gray-300 text-gray-900"
   }`;
 
-  // Pagination button base style
   const paginationButtonBaseClass = `py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium flex items-center justify-center rounded-md focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-blue-500 transition-colors`;
   const paginationButtonThemeClass = isDark
     ? `bg-gray-700 border border-gray-600 text-gray-300 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed`
@@ -479,14 +488,14 @@ function Leads() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           <div className="min-w-0">
             <h1
-              className={`text-lg sm:text-xl md:text-2xl font-bold ${
+              className={`text-2xl md:text-3xl font-bold ${
                 isDark ? "text-white" : "text-gray-800"
               }`}
             >
               Lead Management
             </h1>
             <p
-              className={`text-xs sm:text-sm mt-0.5 sm:mt-1 ${
+              className={`text-gray-500 dark:text-gray-400 ${
                 isDark ? "text-gray-400" : "text-gray-600"
               }`}
             >
@@ -505,7 +514,8 @@ function Leads() {
                     : "bg-blue-500 hover:bg-blue-600 text-white"
                 }`}
               >
-                <Plus size={14} /> Add Lead
+                <Plus size={16} className="sm:size-5" /> Add Lead{" "}
+                {/* Adjusted icon size */}
               </button>
             )}
             {hasPermission("import_leads") && (
@@ -519,7 +529,8 @@ function Leads() {
                     : "bg-green-500 hover:bg-green-600 text-white"
                 }`}
               >
-                <FileUp size={14} /> Import
+                <FileUp size={16} className="sm:size-5" /> Import{" "}
+                {/* Adjusted icon size */}
               </button>
             )}
             {hasPermission("export_leads") && (
@@ -533,7 +544,8 @@ function Leads() {
                     : "bg-purple-500 hover:bg-purple-600 text-white"
                 }`}
               >
-                <Download size={14} /> Export
+                <Download size={16} className="sm:size-5" /> Export{" "}
+                {/* Adjusted icon size */}
               </button>
             )}
           </div>
@@ -647,7 +659,7 @@ function Leads() {
                     setCurrentPage(1);
                   }}
                   className={filterSelectStyle}
-                  disabled={users.length === 0}
+                  disabled={users.length === 0 && !loading} // Disable if no users and not loading
                 >
                   <option value="All Assignees">All Assignees</option>
                   {users
@@ -668,16 +680,17 @@ function Leads() {
                     ))}
                 </select>
               </div>
+              {/* MODIFIED BUTTON BELOW */}
               <button
                 type="button"
-                onClick={() => setRefreshTrigger((prev) => prev + 1)}
+                onClick={handleResetFilters} // Changed onClick handler
                 disabled={loading}
                 className={`p-2 sm:p-2.5 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 self-end flex-shrink-0 ${
                   isDark
                     ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
                     : "bg-white border-gray-300 text-gray-700 hover:bg-gray-100"
                 }`}
-                title="Refresh Leads"
+                title="Reset Filters" // Changed title
               >
                 <RefreshCw
                   size={16}
@@ -687,21 +700,22 @@ function Leads() {
             </div>
           </div>
         </div>
-        {loading && leads.length > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 h-0.5">
-            <div
-              className={`h-full w-full ${
-                isDark ? "bg-blue-500/30" : "bg-blue-500/20"
-              } overflow-hidden`}
-            >
+        {loading &&
+          leads.length > 0 && ( // Show progress bar only if there are existing leads being filtered/reloaded
+            <div className="absolute bottom-0 left-0 right-0 h-0.5">
               <div
-                className={`h-full ${
-                  isDark ? "bg-blue-500" : "bg-blue-500"
-                } animate-indeterminate-progress`}
-              ></div>
+                className={`h-full w-full ${
+                  isDark ? "bg-blue-500/30" : "bg-blue-500/20"
+                } overflow-hidden`}
+              >
+                <div
+                  className={`h-full ${
+                    isDark ? "bg-blue-500" : "bg-blue-500"
+                  } animate-indeterminate-progress`}
+                ></div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
 
       <div
@@ -709,11 +723,12 @@ function Leads() {
           isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
         }`}
       >
-        {loading && leads.length === 0 && <LoadingSpinner size="lg" />}
+        {loading && leads.length === 0 && <LoadingSpinner size="lg" />}{" "}
+        {/* Show spinner if loading and no leads yet */}
         {error && !loading && (
           <ErrorMessage
             error={error}
-            onRetry={() => setRefreshTrigger((prev) => prev + 1)}
+            onRetry={handleResetFilters} // Allow retry to also reset filters
           />
         )}
         {!loading && leads.length === 0 && !error && (
@@ -738,7 +753,6 @@ function Leads() {
             )}
           </div>
         )}
-
         {leads.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px] sm:min-w-[768px] md:min-w-[900px]">
@@ -827,7 +841,8 @@ function Leads() {
                             alt={lead.assignedTo}
                             className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover"
                             onError={(e) => {
-                              e.target.style.display = "none";
+                              e.target.style.display = "none"; // Hide if image fails to load
+                              // Optionally, show a placeholder avatar here
                             }}
                           />
                         ) : (
@@ -862,14 +877,15 @@ function Leads() {
                           }`}
                           title="View/Edit Lead"
                         >
-                          <Edit size={12} />
+                          <Edit size={14} /> {/* Adjusted icon size */}
                         </button>
                         {hasPermission("delete_leads") && (
                           <button
                             type="button"
                             onClick={() => {
+                              // Keep original delete confirmation flow
                               setSelectedLead(lead);
-                              setIsDetailsModalOpen(true);
+                              setIsDetailsModalOpen(true); // Open details, can delete from there
                             }}
                             className={`p-0.5 sm:p-1 rounded-md ${
                               isDark
@@ -878,7 +894,7 @@ function Leads() {
                             }`}
                             title="Delete Lead"
                           >
-                            <Trash2 size={12} />
+                            <Trash2 size={14} /> {/* Adjusted icon size */}
                           </button>
                         )}
                       </div>
@@ -889,8 +905,6 @@ function Leads() {
             </table>
           </div>
         )}
-
-        {/* PAGINATION UI FIXES APPLIED BELOW */}
         {totalLeads > 0 && !error && leads.length > 0 && (
           <div
             className={`px-2 sm:px-4 py-2 sm:py-3 border-t ${
@@ -914,8 +928,6 @@ function Leads() {
                 of <span className="font-medium">{totalLeads}</span>
               </div>
               <div className="flex items-center gap-1 sm:gap-2">
-                {" "}
-                {/* Gap between dropdown and nav buttons */}
                 <select
                   value={pageSize}
                   onChange={(e) => {
@@ -934,10 +946,7 @@ function Leads() {
                     </option>
                   ))}
                 </select>
-                {/* Navigation Buttons Container */}
                 <div className="flex items-center gap-0.5">
-                  {" "}
-                  {/* Small gap between individual nav buttons */}
                   <button
                     type="button"
                     onClick={() => setCurrentPage(1)}
@@ -951,7 +960,7 @@ function Leads() {
                     type="button"
                     onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
                     disabled={currentPage === 1 || totalPages === 0}
-                    className={`${paginationButtonBaseClass} ${paginationButtonThemeClass} px-2 sm:px-2`} // Slightly less padding for icon button
+                    className={`${paginationButtonBaseClass} ${paginationButtonThemeClass} px-2 sm:px-2`}
                     title="Previous"
                   >
                     <ChevronLeft size={16} />
@@ -971,7 +980,7 @@ function Leads() {
                       setCurrentPage(Math.min(currentPage + 1, totalPages || 1))
                     }
                     disabled={currentPage === totalPages || totalPages === 0}
-                    className={`${paginationButtonBaseClass} ${paginationButtonThemeClass} px-2 sm:px-2`} // Slightly less padding for icon button
+                    className={`${paginationButtonBaseClass} ${paginationButtonThemeClass} px-2 sm:px-2`}
                     title="Next"
                   >
                     <ChevronRight size={16} />

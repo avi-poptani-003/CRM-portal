@@ -1,16 +1,46 @@
 // src/components/leads/AddLeadModal.jsx
 import React, { useState, useEffect } from "react";
 import { useTheme } from "../../context/ThemeContext";
-import { X } from 'lucide-react';
+import { X } from "lucide-react";
 
-const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, isEdit = false }) => {
+const AddLeadModal = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  users = [],
+  leadData = null,
+  isEdit = false,
+}) => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
   // Lead sources and statuses
-  const leadSources = ["Website", "WhatsApp", "Facebook", "Referral", "Direct Call", "Email", "Exhibition"];
-  const leadStatuses = ["New", "Contacted", "Site Visit Scheduled", "Site Visit Done", "Negotiation", "Converted", "Dropped"];
-  const propertyInterests = ["Green Valley Homes", "Urban Heights Tower", "Lakeside Villas", "Sunset Apartments", "Metro Business Park", "Royal Gardens", "City Center Plaza"];
+  const leadSources = [
+    "Website",
+    "WhatsApp",
+    "Facebook",
+    "Referral",
+    "Direct Call",
+    "Email",
+  ];
+  const leadStatuses = [
+    "New",
+    "Contacted",
+    "Site Visit Scheduled",
+    "Site Visit Done",
+    "Negotiation",
+    "Converted",
+    "Dropped",
+  ];
+  const propertyInterests = [
+    "Green Valley Homes",
+    "Urban Heights Tower",
+    "Lakeside Villas",
+    "Sunset Apartments",
+    "Metro Business Park",
+    "Royal Gardens",
+    "City Center Plaza",
+  ];
 
   // Form state
   const [formData, setFormData] = useState({
@@ -54,7 +84,7 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
         notes: "",
       });
     }
-    
+
     // Reset errors
     setErrors({});
   }, [isEdit, leadData, isOpen]);
@@ -66,7 +96,7 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
       ...prev,
       [name]: value,
     }));
-    
+
     // Clear error for this field
     if (errors[name]) {
       setErrors((prev) => ({
@@ -79,29 +109,29 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
   // Validate form
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.name.trim()) {
       newErrors.name = "Name is required";
     }
-    
+
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = "Email is invalid";
     }
-    
+
     if (!formData.phone.trim()) {
       newErrors.phone = "Phone is required";
     }
-    
+
     if (!formData.interest.trim()) {
       newErrors.interest = "Interest is required";
     }
-    
+
     if (!formData.assignedTo.trim()) {
       newErrors.assignedTo = "Assigned To is required";
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -109,7 +139,7 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (validateForm()) {
       onSubmit(formData);
     }
@@ -124,9 +154,14 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
           <div className="absolute inset-0 bg-gray-900 opacity-75"></div>
         </div>
 
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <span
+          className="hidden sm:inline-block sm:align-middle sm:h-screen"
+          aria-hidden="true"
+        >
+          &#8203;
+        </span>
 
-        <div 
+        <div
           className={`inline-block align-bottom rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full ${
             isDark ? "bg-gray-800 text-white" : "bg-white text-gray-900"
           }`}
@@ -138,8 +173,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
             <button
               onClick={onClose}
               className={`rounded-full p-1 ${
-                isDark 
-                  ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200" 
+                isDark
+                  ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200"
                   : "hover:bg-gray-200 text-gray-500 hover:text-gray-700"
               }`}
             >
@@ -152,8 +187,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
               <div className="grid grid-cols-1 gap-4">
                 {/* Name */}
                 <div>
-                  <label 
-                    htmlFor="name" 
+                  <label
+                    htmlFor="name"
                     className={`block text-sm font-medium mb-1 ${
                       isDark ? "text-gray-300" : "text-gray-700"
                     }`}
@@ -167,8 +202,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
                     value={formData.name}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-md ${
-                      isDark 
-                        ? "bg-gray-700 border-gray-600 text-white" 
+                      isDark
+                        ? "bg-gray-700 border-gray-600 text-white"
                         : "bg-white border-gray-300 text-gray-900"
                     } ${errors.name ? "border-red-500" : ""}`}
                   />
@@ -179,8 +214,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
 
                 {/* Email */}
                 <div>
-                  <label 
-                    htmlFor="email" 
+                  <label
+                    htmlFor="email"
                     className={`block text-sm font-medium mb-1 ${
                       isDark ? "text-gray-300" : "text-gray-700"
                     }`}
@@ -194,8 +229,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
                     value={formData.email}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-md ${
-                      isDark 
-                        ? "bg-gray-700 border-gray-600 text-white" 
+                      isDark
+                        ? "bg-gray-700 border-gray-600 text-white"
                         : "bg-white border-gray-300 text-gray-900"
                     } ${errors.email ? "border-red-500" : ""}`}
                   />
@@ -206,8 +241,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
 
                 {/* Phone */}
                 <div>
-                  <label 
-                    htmlFor="phone" 
+                  <label
+                    htmlFor="phone"
                     className={`block text-sm font-medium mb-1 ${
                       isDark ? "text-gray-300" : "text-gray-700"
                     }`}
@@ -221,8 +256,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
                     value={formData.phone}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-md ${
-                      isDark 
-                        ? "bg-gray-700 border-gray-600 text-white" 
+                      isDark
+                        ? "bg-gray-700 border-gray-600 text-white"
                         : "bg-white border-gray-300 text-gray-900"
                     } ${errors.phone ? "border-red-500" : ""}`}
                   />
@@ -233,8 +268,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
 
                 {/* Status */}
                 <div>
-                  <label 
-                    htmlFor="status" 
+                  <label
+                    htmlFor="status"
                     className={`block text-sm font-medium mb-1 ${
                       isDark ? "text-gray-300" : "text-gray-700"
                     }`}
@@ -247,8 +282,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
                     value={formData.status}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-md ${
-                      isDark 
-                        ? "bg-gray-700 border-gray-600 text-white" 
+                      isDark
+                        ? "bg-gray-700 border-gray-600 text-white"
                         : "bg-white border-gray-300 text-gray-900"
                     }`}
                   >
@@ -262,8 +297,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
 
                 {/* Source */}
                 <div>
-                  <label 
-                    htmlFor="source" 
+                  <label
+                    htmlFor="source"
                     className={`block text-sm font-medium mb-1 ${
                       isDark ? "text-gray-300" : "text-gray-700"
                     }`}
@@ -276,8 +311,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
                     value={formData.source}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-md ${
-                      isDark 
-                        ? "bg-gray-700 border-gray-600 text-white" 
+                      isDark
+                        ? "bg-gray-700 border-gray-600 text-white"
                         : "bg-white border-gray-300 text-gray-900"
                     }`}
                   >
@@ -291,8 +326,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
 
                 {/* Interest */}
                 <div>
-                  <label 
-                    htmlFor="interest" 
+                  <label
+                    htmlFor="interest"
                     className={`block text-sm font-medium mb-1 ${
                       isDark ? "text-gray-300" : "text-gray-700"
                     }`}
@@ -305,8 +340,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
                     value={formData.interest}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-md ${
-                      isDark 
-                        ? "bg-gray-700 border-gray-600 text-white" 
+                      isDark
+                        ? "bg-gray-700 border-gray-600 text-white"
                         : "bg-white border-gray-300 text-gray-900"
                     } ${errors.interest ? "border-red-500" : ""}`}
                   >
@@ -318,14 +353,16 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
                     ))}
                   </select>
                   {errors.interest && (
-                    <p className="mt-1 text-sm text-red-500">{errors.interest}</p>
+                    <p className="mt-1 text-sm text-red-500">
+                      {errors.interest}
+                    </p>
                   )}
                 </div>
 
                 {/* Assigned To */}
                 <div>
-                  <label 
-                    htmlFor="assignedTo" 
+                  <label
+                    htmlFor="assignedTo"
                     className={`block text-sm font-medium mb-1 ${
                       isDark ? "text-gray-300" : "text-gray-700"
                     }`}
@@ -338,8 +375,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
                     value={formData.assignedTo}
                     onChange={handleChange}
                     className={`w-full px-3 py-2 border rounded-md ${
-                      isDark 
-                        ? "bg-gray-700 border-gray-600 text-white" 
+                      isDark
+                        ? "bg-gray-700 border-gray-600 text-white"
                         : "bg-white border-gray-300 text-gray-900"
                     } ${errors.assignedTo ? "border-red-500" : ""}`}
                   >
@@ -351,14 +388,16 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
                     ))}
                   </select>
                   {errors.assignedTo && (
-                    <p className="mt-1 text-sm text-red-500">{errors.assignedTo}</p>
+                    <p className="mt-1 text-sm text-red-500">
+                      {errors.assignedTo}
+                    </p>
                   )}
                 </div>
 
                 {/* Notes */}
                 <div>
-                  <label 
-                    htmlFor="notes" 
+                  <label
+                    htmlFor="notes"
                     className={`block text-sm font-medium mb-1 ${
                       isDark ? "text-gray-300" : "text-gray-700"
                     }`}
@@ -372,8 +411,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
                     onChange={handleChange}
                     rows="3"
                     className={`w-full px-3 py-2 border rounded-md ${
-                      isDark 
-                        ? "bg-gray-700 border-gray-600 text-white" 
+                      isDark
+                        ? "bg-gray-700 border-gray-600 text-white"
                         : "bg-white border-gray-300 text-gray-900"
                     }`}
                   ></textarea>
@@ -386,8 +425,8 @@ const AddLeadModal = ({ isOpen, onClose, onSubmit, users = [], leadData = null, 
                 type="button"
                 onClick={onClose}
                 className={`px-4 py-2 rounded-md ${
-                  isDark 
-                    ? "bg-gray-600 text-white hover:bg-gray-500" 
+                  isDark
+                    ? "bg-gray-600 text-white hover:bg-gray-500"
                     : "bg-gray-200 text-gray-800 hover:bg-gray-300"
                 }`}
               >
