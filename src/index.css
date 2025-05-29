@@ -53,3 +53,31 @@ body.dark {
               color 200ms ease-in-out;
 }
 
+
+/* Custom Scrollbar Styles based on image */
+/* For Webkit browsers (Chrome, Safari, newer versions of Opera) */
+::-webkit-scrollbar {
+  width: 10px; /* Further increased width of the scrollbar */
+  height: 10px; /* Further increased height of the scrollbar for horizontal scrollbars */
+}
+
+::-webkit-scrollbar-track {
+  background: #ffffff; /* White track */
+  border-radius: 5px; /* Slightly rounded track edges */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4A8ACC; /* Adjusted darker blue thumb color */
+  border-radius: 20px; /* Pill-shaped thumb */
+  border: 2px solid #ffffff; /* Optional: adds a small white border around the thumb */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #367AB7; /* Adjusted darker blue on hover */
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: auto; /* "auto" or "thin" */
+  scrollbar-color: #4A8ACC #ffffff; /* thumb and track color (adjusted blue thumb, track white) */
+}

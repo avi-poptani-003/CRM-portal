@@ -304,7 +304,7 @@ const AddPropertyForm = ({ initialData = null, isEditing = false }) => {
             Back to Properties
           </button>
           <h1 className="text-2xl md:text-3xl font-semibold">{isEditing ? "Edit Property" : "Add New Property"}</h1>
-          <p className="text-sm mt-2">Fill in the details to {isEditing ? "update" : "add a new"} property listing</p>
+          <p className="text-sm mt-2">Fiell in the details to {isEditing ? "update" : "add a new"} property listing</p>
         </div>
 
         {/* Progress Steps */}
@@ -860,12 +860,18 @@ const AddPropertyForm = ({ initialData = null, isEditing = false }) => {
                       Phone Number
                     </label>
                     <input
-                      type="text"
+                      type="tel"
                       id="contactPhone"
                       name="contactPhone"
-                      placeholder="Your phone number"
+                      placeholder="Enter 10-digit phone number"
                       value={formData.contactPhone}
-                      onChange={handleInputChange}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        handleInputChange({ target: { name: 'contactPhone', value } });
+                      }}
+                      pattern="[0-9]{10}"
+                      maxLength={10}
+                      title="Please enter exactly 10 digits"
                       className={`w-full px-4 py-2 rounded-lg border ${isDark ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
                     />
                   </div>
