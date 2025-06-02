@@ -22,6 +22,7 @@ import { toast } from "react-toastify";
 import LeadService from "../services/leadService";
 import UserService from "../services/UserService";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -45,6 +46,9 @@ function debounce(func, delay) {
 
 function Leads() {
   const { theme } = useTheme();
+  const auth = useAuth();
+  const { user, isAdmin, isManager, isAgent } = auth;
+
   const { hasPermission } = useUserRole();
   const isDark = theme === "dark";
 
@@ -60,7 +64,7 @@ function Leads() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   const [leads, setLeads] = useState([]);
-  const [users, setUsersState] = useState([]);
+  const [usersStateInternal, setUsersStateInternal] = useState([]); // Correctly declared
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -94,7 +98,6 @@ function Leads() {
     "Dropped",
   ].sort();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSetSearchQuery = useCallback(
     debounce((query) => {
       setSearchQuery(query);
@@ -107,13 +110,32 @@ function Leads() {
     debouncedSetSearchQuery(searchInput);
   }, [searchInput, debouncedSetSearchQuery]);
 
+  const isCurrentUserPureAgent = user && isAgent() && !isManager() && !isAdmin();
+
+  useEffect(() => {
+    if (isCurrentUserPureAgent && user?.id) {
+      if (assigneeFilter !== user.id.toString()) {
+        setAssigneeFilter(user.id.toString());
+      }
+    }
+  }, [user, isCurrentUserPureAgent, assigneeFilter]);
+
+
   useEffect(() => {
     const loadData = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
+        // Fetch users only if not a pure agent, or if needed for other reasons
+        // Pure agents might not need the full list if UI is adapted.
+        // However, AddLeadDialog/LeadDetailsDialog might still expect it.
+        // For now, fetching for all roles that can access this page.
         const usersResponse = await UserService.getUsers();
-        setUsersState(usersResponse.results || usersResponse || []);
+        setUsersStateInternal(usersResponse.results || usersResponse || []); // Correctly set
 
         const params = {
           page: currentPage,
@@ -121,16 +143,29 @@ function Leads() {
           ...(searchQuery && { search: searchQuery }),
           ...(statusFilter !== "All Statuses" && { status: statusFilter }),
           ...(sourceFilter !== "All Sources" && { source: sourceFilter }),
-          ...(assigneeFilter !== "All Assignees" && {
-            assigned_to: assigneeFilter,
-          }),
         };
+
+        if (isCurrentUserPureAgent) {
+          params.assigned_to = user.id;
+        } else if (isManager() && !isAdmin()) {
+          if (assigneeFilter !== "All Assignees") {
+            params.assigned_to = assigneeFilter;
+          }
+        } else if (isAdmin()) {
+          if (assigneeFilter !== "All Assignees") {
+            params.assigned_to = assigneeFilter;
+          }
+        } else {
+             if (assigneeFilter !== "All Assignees") {
+                params.assigned_to = assigneeFilter;
+            }
+        }
 
         const leadsResponse = await LeadService.getLeads(params);
 
-        const currentUsers = usersResponse.results || usersResponse || [];
+        const currentUsersForMapping = usersResponse.results || usersResponse || [];
         const transformedLeads = leadsResponse.results.map((lead) => {
-          const assignedUser = currentUsers.find(
+          const assignedUser = currentUsersForMapping.find(
             (u) => u.id === lead.assigned_to
           );
           return {
@@ -185,6 +220,9 @@ function Leads() {
 
     loadData();
   }, [
+    user,
+    isAdmin, isManager, isAgent,
+    isCurrentUserPureAgent,
     currentPage,
     pageSize,
     refreshTrigger,
@@ -304,10 +342,14 @@ function Leads() {
         ...(searchQuery && { search: searchQuery }),
         ...(statusFilter !== "All Statuses" && { status: statusFilter }),
         ...(sourceFilter !== "All Sources" && { source: sourceFilter }),
-        ...(assigneeFilter !== "All Assignees" && {
-          assigned_to: assigneeFilter,
-        }),
       };
+
+      if (isCurrentUserPureAgent && user?.id) {
+        filters.assigned_to = user.id;
+      } else if (assigneeFilter !== "All Assignees") {
+        filters.assigned_to = assigneeFilter;
+      }
+
       const blob = await LeadService.exportLeads(filters);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -437,6 +479,7 @@ function Leads() {
     setSelectedLead(lead);
     setIsDetailsModalOpen(true);
   };
+
   const formatDateForDisplay = (dateString) => {
     if (!dateString) return "N/A";
     try {
@@ -463,7 +506,6 @@ function Leads() {
       : "bg-white border-gray-300 text-gray-900"
   }`;
 
-  // Pagination button base style
   const paginationButtonBaseClass = `py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium flex items-center justify-center rounded-md focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-blue-500 transition-colors`;
   const paginationButtonThemeClass = isDark
     ? `bg-gray-700 border border-gray-600 text-gray-300 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed`
@@ -643,29 +685,39 @@ function Leads() {
                   id="assigneeFilter"
                   value={assigneeFilter}
                   onChange={(e) => {
-                    setAssigneeFilter(e.target.value);
-                    setCurrentPage(1);
+                    if (!isCurrentUserPureAgent) {
+                      setAssigneeFilter(e.target.value);
+                      setCurrentPage(1);
+                    }
                   }}
                   className={filterSelectStyle}
-                  disabled={users.length === 0}
+                  disabled={usersStateInternal.length === 0 || (isCurrentUserPureAgent && !!user)}
                 >
-                  <option value="All Assignees">All Assignees</option>
-                  {users
-                    .filter(
-                      (user) =>
-                        user &&
-                        user.role &&
-                        (user.role.toLowerCase().includes("manager") ||
-                          user.role.toLowerCase().includes("agent") ||
-                          user.role.toLowerCase().includes("admin"))
-                    )
-                    .map((user) => (
-                      <option key={user.id} value={user.id.toString()}>
-                        {`${user.first_name || "User"} ${
-                          user.last_name || ""
-                        }`.trim() || `User ID: ${user.id}`}
-                      </option>
-                    ))}
+                  {isCurrentUserPureAgent && user ? (
+                    <option value={user.id.toString()}>
+                      {`${user.first_name || "My"} ${user.last_name || "Leads"}`.trim()}
+                    </option>
+                  ) : (
+                    <>
+                      <option value="All Assignees">All Assignees</option>
+                      {usersStateInternal
+                        .filter(
+                          (u) =>
+                            u &&
+                            u.role &&
+                            (u.role.toLowerCase().includes("manager") ||
+                              u.role.toLowerCase().includes("agent") ||
+                              u.role.toLowerCase().includes("admin"))
+                        )
+                        .map((u) => (
+                          <option key={u.id} value={u.id.toString()}>
+                            {`${u.first_name || "User"} ${
+                              u.last_name || ""
+                            }`.trim() || `User ID: ${u.id}`}
+                          </option>
+                        ))}
+                    </>
+                  )}
                 </select>
               </div>
               <button
@@ -869,7 +921,7 @@ function Leads() {
                             type="button"
                             onClick={() => {
                               setSelectedLead(lead);
-                              setIsDetailsModalOpen(true);
+                              setIsDetailsModalOpen(true); // Delete confirmation can be inside details modal
                             }}
                             className={`p-0.5 sm:p-1 rounded-md ${
                               isDark
@@ -890,7 +942,6 @@ function Leads() {
           </div>
         )}
 
-        {/* PAGINATION UI FIXES APPLIED BELOW */}
         {totalLeads > 0 && !error && leads.length > 0 && (
           <div
             className={`px-2 sm:px-4 py-2 sm:py-3 border-t ${
@@ -914,8 +965,6 @@ function Leads() {
                 of <span className="font-medium">{totalLeads}</span>
               </div>
               <div className="flex items-center gap-1 sm:gap-2">
-                {" "}
-                {/* Gap between dropdown and nav buttons */}
                 <select
                   value={pageSize}
                   onChange={(e) => {
@@ -934,10 +983,7 @@ function Leads() {
                     </option>
                   ))}
                 </select>
-                {/* Navigation Buttons Container */}
                 <div className="flex items-center gap-0.5">
-                  {" "}
-                  {/* Small gap between individual nav buttons */}
                   <button
                     type="button"
                     onClick={() => setCurrentPage(1)}
@@ -951,7 +997,7 @@ function Leads() {
                     type="button"
                     onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
                     disabled={currentPage === 1 || totalPages === 0}
-                    className={`${paginationButtonBaseClass} ${paginationButtonThemeClass} px-2 sm:px-2`} // Slightly less padding for icon button
+                    className={`${paginationButtonBaseClass} ${paginationButtonThemeClass} px-2 sm:px-2`}
                     title="Previous"
                   >
                     <ChevronLeft size={16} />
@@ -971,7 +1017,7 @@ function Leads() {
                       setCurrentPage(Math.min(currentPage + 1, totalPages || 1))
                     }
                     disabled={currentPage === totalPages || totalPages === 0}
-                    className={`${paginationButtonBaseClass} ${paginationButtonThemeClass} px-2 sm:px-2`} // Slightly less padding for icon button
+                    className={`${paginationButtonBaseClass} ${paginationButtonThemeClass} px-2 sm:px-2`}
                     title="Next"
                   >
                     <ChevronRight size={16} />
@@ -992,12 +1038,13 @@ function Leads() {
         )}
       </div>
 
+      {/* Ensure usersStateInternal is passed as 'users' prop */}
       {isAddLeadModalOpen && (
         <AddLeadDialog
           isOpen={isAddLeadModalOpen}
           onClose={() => setIsAddLeadModalOpen(false)}
           onSubmit={handleAddLead}
-          users={users}
+          users={usersStateInternal} /* Corrected: Pass usersStateInternal */
         />
       )}
       {isImportModalOpen && (
@@ -1017,7 +1064,7 @@ function Leads() {
           lead={selectedLead}
           onUpdate={handleUpdateLead}
           onDelete={handleDeleteLead}
-          users={users}
+          users={usersStateInternal} /* Corrected: Pass usersStateInternal */
           canEdit={hasPermission("edit_leads")}
           canDelete={hasPermission("delete_leads")}
         />

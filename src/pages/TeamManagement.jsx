@@ -45,9 +45,9 @@ function TeamManagement() {
   };
 
   const handleChange = (e) => {
-    setFormData({ 
-      ...formData, 
-      [e.target.name]: e.target.value, 
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
     });
   };
 
@@ -60,19 +60,19 @@ function TeamManagement() {
     setError("");
     setSuccessMessage("");
     try {
-      await authService.getApiInstance().post("/users/", formData); 
-      setSuccessMessage("User created successfully!"); 
-      setShowCreateModal(false); 
-      fetchUsers(); 
-      setFormData({ 
-        username: "", 
-        email: "", 
-        password: "", 
-        password_confirm: "", 
+      await authService.getApiInstance().post("/users/", formData);
+      setSuccessMessage("User created successfully!");
+      setShowCreateModal(false);
+      fetchUsers();
+      setFormData({
+        username: "",
+        email: "",
+        password: "",
+        password_confirm: "",
         first_name: "",
-        last_name: "", 
-        phone_number: "", 
-        role: "agent", 
+        last_name: "",
+        phone_number: "",
+        role: "agent",
       });
     } catch (err) {
       if (err.response?.data) {
@@ -125,28 +125,34 @@ function TeamManagement() {
     );
   }
 
-  const filteredUsers = users.filter((userItem) => { // Renamed parameter
-    const searchMatch = //
-      userItem.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) || //
-      userItem.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) || //
-      userItem.username?.toLowerCase().includes(searchTerm.toLowerCase()) || //
-      userItem.email?.toLowerCase().includes(searchTerm.toLowerCase()); //
+  const filteredUsers = users.filter((userItem) => {
+    // Exclude clients or any other undesired roles
+    const allowedRoles = ["admin", "manager", "agent"];
+    if (!userItem.role || !allowedRoles.includes(userItem.role.toLowerCase())) {
+      return false;
+    }
 
-    const roleMatch = //
-      roleFilter === "All" || //
-      userItem.role?.toLowerCase() === roleFilter.toLowerCase(); //
+    const searchMatch =
+      (userItem.first_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (userItem.last_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (userItem.username || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (userItem.email || "").toLowerCase().includes(searchTerm.toLowerCase());
 
-    return searchMatch && roleMatch; //
+    const roleMatch =
+      roleFilter === "All" ||
+      (userItem.role || "").toLowerCase() === roleFilter.toLowerCase();
+
+    return searchMatch && roleMatch;
   });
 
   const getInitials = (firstName, lastName) => {
-    return `${firstName?.charAt(0) || ""}${ //
-      lastName?.charAt(0) || "" //
+    return `${(firstName || "").charAt(0)}${ //
+      (lastName || "").charAt(0) //
     }`.toUpperCase(); //
   };
 
   const getRoleColor = (role) => {
-    switch (role?.toLowerCase()) { //
+    switch ((role || "").toLowerCase()) { //
       case "admin": //
         return isDark //
           ? "bg-purple-900 text-purple-200 border-purple-700" //
@@ -167,7 +173,8 @@ function TeamManagement() {
   };
 
   const getRoleDisplayName = (role) => {
-    switch (role?.toLowerCase()) { //
+    const r = role || "";
+    switch (r.toLowerCase()) { //
       case "manager": //
         return "Manager"; //
       case "agent": //
@@ -175,7 +182,7 @@ function TeamManagement() {
       case "admin": //
         return "Administrator"; //
       default:
-        return role ? role.charAt(0).toUpperCase() + role.slice(1) : "N/A"; //
+        return r ? r.charAt(0).toUpperCase() + r.slice(1) : "N/A"; //
     }
   };
 
@@ -261,14 +268,14 @@ function TeamManagement() {
 
       {/* Team Member Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredUsers.length > 0 ? ( 
+        {filteredUsers.length > 0 ? (
           filteredUsers.map((member) => ( // Renamed to member for clarity
             <div
               key={`${member.id}-${member.username}-${member.email}`} // Use member.id for a more stable key
               className={`relative rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out overflow-hidden border ${ //
-                isDark 
-                  ? "bg-gray-800 border-gray-700 hover:border-blue-600" 
-                  : "bg-white border-gray-200 hover:border-blue-400" 
+                isDark
+                  ? "bg-gray-800 border-gray-700 hover:border-blue-600"
+                  : "bg-white border-gray-200 hover:border-blue-400"
               }`}
             >
               {/* Delete Button */}
@@ -370,7 +377,7 @@ function TeamManagement() {
 
       {/* Create User Modal */}
       {showCreateModal && ( //
-        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-opacity-60 backdrop-blur-xl flex items-center justify-center z-50 p-4">
           <div
             className={`relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-xl border ${ //
               isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-300" //
@@ -508,14 +515,14 @@ function TeamManagement() {
                 <div>
                   <label
                     htmlFor="phone_number"
-                    className={`block text-sm font-medium mb-1.5 ${ 
-                      isDark ? "text-gray-300" : "text-gray-600" 
+                    className={`block text-sm font-medium mb-1.5 ${
+                      isDark ? "text-gray-300" : "text-gray-600"
                     }`}
                   >
                     Phone Number
                   </label>
                   <input
-                    type="tel" 
+                    type="tel"
                     name="phone_number"
                     value={formData.phone_number}
                     onChange={(e) => {
@@ -544,9 +551,9 @@ function TeamManagement() {
                   </label>
                   <select
                     id="role"
-                    name="role" 
-                    value={formData.role} 
-                    onChange={handleChange} 
+                    name="role"
+                    value={formData.role}
+                    onChange={handleChange}
                     required
                     className={`w-full px-4 py-2.5 border rounded-lg transition-colors shadow-sm appearance-none ${ //
                       isDark //
@@ -554,8 +561,8 @@ function TeamManagement() {
                         : "bg-white border-gray-300 text-gray-800 focus:ring-blue-500 focus:border-blue-500" //
                     }`}
                   >
-                    <option value="agent">Agent</option> 
-                    <option value="manager">Manager</option> 
+                    <option value="agent">Agent</option>
+                    <option value="manager">Manager</option>
                     {/* Add Admin option if needed, ensure backend supports it */}
                     {/* <option value="admin">Administrator</option>  */}
                   </select>

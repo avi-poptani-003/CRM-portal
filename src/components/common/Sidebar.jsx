@@ -30,7 +30,7 @@ const Sidebar = () => {
     { path: "/dashboard/leads", label: "Leads", icon: Users, roles: ["admin", "manager", "agent"] },
     { path: "/dashboard/properties", label: "Properties", icon: Building2, roles: ["admin", "manager", "agent"] },
     { path: "/dashboard/site-visits", label: "Site Visits", icon: CalendarCheck, roles: ["admin", "manager", "agent"] },
-    { path: "/dashboard/team", label: "Team Management", icon: UserCog, roles: ["admin", "manager"] },
+    { path: "/dashboard/team", label: "Team Management", icon: UserCog, roles: ["admin"] },
     { path: "/dashboard/analytics", label: "Analytics", icon: BarChart3, roles: ["admin", "manager"] },
     { path: "/dashboard/settings", label: "Settings", icon: Settings, roles: ["admin", "manager", "agent"] },
   ];

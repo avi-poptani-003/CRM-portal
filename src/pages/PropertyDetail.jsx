@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext"; // Ensure this path is correct
 import propertyService from "../services/propertyService"; // Ensure this path is correct
-import { ArrowLeft, MapPin, Phone, User, Calendar, Maximize, Home, DollarSign, Compass, Briefcase, Share2, Heart, Printer, Clock, Check, X } from 'lucide-react';
+import { ArrowLeft, MapPin, Phone, User, Calendar, Maximize, Home, DollarSign, Compass, Briefcase, Share2, Heart, Printer, Clock, Check, X, Zap, ListChecks } from 'lucide-react'; // Added Zap, ListChecks
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
@@ -47,11 +47,11 @@ const getStatusBadgeClass = (status) => {
 const getStatusTextClass = (status) => {
   const safeStatus = String(status || '').toLowerCase();
   switch (safeStatus) {
-    case 'available': return 'text-green-700 dark:text-green-300'; // Badge class includes background, this is for text only
+    case 'available': return 'text-green-700 dark:text-green-300';
     case 'under_construction': return 'text-orange-700 dark:text-orange-300';
     case 'coming_soon': return 'text-blue-700 dark:text-blue-300';
     case 'sold_out': return 'text-red-700 dark:text-red-300';
-    default: return 'text-gray-700 dark:text-gray-300'; // For text, not a badge
+    default: return 'text-gray-700 dark:text-gray-300';
   }
 };
 
@@ -63,7 +63,7 @@ const PropertyDetail = () => {
   const isDark = theme === "dark";
 
   const [property, setProperty] = useState(null);
-  const [loading, setLoading] = useState(true); // Initialize loading to true
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeImage, setActiveImage] = useState(0);
   const [showAllThumbnails, setShowAllThumbnails] = useState(false);
@@ -80,8 +80,6 @@ const PropertyDetail = () => {
   }, [property]);
 
   useEffect(() => {
-    // Critical for preventing FOUC:
-    // Set loading to true and clear previous data immediately when ID changes or on initial valid ID.
     if (id && id !== 'undefined' && id !== null) {
       setLoading(true);
       setError(null);
@@ -95,7 +93,6 @@ const PropertyDetail = () => {
 
     const storedPropertyData = sessionStorage.getItem('lastCreatedProperty');
     const newlyCreatedPropertyData = sessionStorage.getItem('newlyCreatedProperty');
-
     let dataFoundInSession = false;
 
     if (newlyCreatedPropertyData) {
@@ -121,15 +118,14 @@ const PropertyDetail = () => {
     }
 
     if (dataFoundInSession) {
-      setLoading(false); // Data found in session, stop loading.
-      return; // Exit effect
+      setLoading(false);
+      return;
     }
 
-    // If not found in sessionStorage, fetch from API
     const fetchPropertyFromAPI = async () => {
       try {
         const data = await propertyService.getProperty(id);
-        setProperty(data);
+        setProperty(data); // This data should now include amenities and specifications
       } catch (err) {
         console.error("Error fetching property from API:", err);
         setError(err.message || "Failed to load property");
@@ -144,7 +140,7 @@ const PropertyDetail = () => {
   }, [id, navigate]);
 
 
-  const handleShare = async () => { /* ... same as before ... */
+  const handleShare = async () => {
     if (!property) return;
     const shareData = {
       title: property.title,
@@ -166,7 +162,7 @@ const PropertyDetail = () => {
     setTimeout(() => setShareStatus({ show: false, message: '', type: '' }), 3000);
   };
 
-  const handleSave = () => { /* ... same as before ... */
+  const handleSave = () => {
     if (!property) return;
     try {
       const savedProperties = JSON.parse(localStorage.getItem('savedProperties') || '[]');
@@ -195,13 +191,33 @@ const PropertyDetail = () => {
     setTimeout(() => setShareStatus({ show: false, message: '', type: '' }), 3000);
   };
 
-  const handlePrint = async () => { /* ... same as before, ensure capitalizeAndFormatDisplayValue is used ... */
+  const handlePrint = async () => {
     if (!property) return;
     setPrintStatus({ loading: true, error: null });
     try {
       const printContainer = document.createElement('div');
       printContainer.id = 'print-container';
       printContainer.style.cssText = 'width: 100%; padding: 20px; background-color: white; color: black;';
+
+      // Generate amenities HTML for PDF
+      let amenitiesHtml = '';
+      if (property.amenities && property.amenities.length > 0) {
+        amenitiesHtml += '<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; margin-bottom: 10px;">Amenities</h2><ul style="list-style: disc; padding-left: 20px;">';
+        property.amenities.forEach(amenity => {
+          amenitiesHtml += `<li>${capitalizeAndFormatDisplayValue(amenity.name)}</li>`;
+        });
+        amenitiesHtml += '</ul></div>';
+      }
+
+      // Generate specifications HTML for PDF
+      let specificationsHtml = '';
+      if (property.specifications && property.specifications.length > 0) {
+        specificationsHtml += '<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; margin-bottom: 10px;">Specifications</h2><div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">';
+        property.specifications.forEach(spec => {
+          specificationsHtml += `<div style="padding: 10px; background-color: #f8f9fa; border-radius: 4px;"><p style="color: #666; font-size: 14px;">${capitalizeAndFormatDisplayValue(spec.key)}</p><p>${capitalizeAndFormatDisplayValue(spec.value)}</p></div>`;
+        });
+        specificationsHtml += '</div></div>';
+      }
 
       printContainer.innerHTML = `
         <div style="max-width: 800px; margin: 0 auto;">
@@ -224,6 +240,8 @@ const PropertyDetail = () => {
               ${property.facing ? `<div style="padding: 10px; background-color: #f8f9fa; border-radius: 4px;"><p style="color: #666; font-size: 14px;">Facing</p><p>${capitalizeAndFormatDisplayValue(property.facing)}</p></div>` : ''}
               ${property.possession_status ? `<div style="padding: 10px; background-color: #f8f9fa; border-radius: 4px;"><p style="color: #666; font-size: 14px;">Possession Status</p><p>${capitalizeAndFormatDisplayValue(property.possession_status)}</p></div>` : ''}
           </div></div>
+          ${amenitiesHtml}
+          ${specificationsHtml}
           ${property.contact_name || property.contact_phone ? `<div style="margin-bottom: 20px;"><h2 style="font-size: 18px; margin-bottom: 10px;">Contact Information</h2>${property.contact_name ? `<p style="margin-bottom: 5px;"><strong>Contact Person:</strong> ${property.contact_name}</p>` : ''}${property.contact_phone ? `<p style="margin-bottom: 5px;"><strong>Phone:</strong> ${property.contact_phone}</p>` : ''}</div>` : ''}
           <div style="font-size: 12px; color: #999; text-align: center; margin-top: 30px;"><p>Property details printed on ${new Date().toLocaleDateString()}</p></div>
         </div>`;
@@ -256,20 +274,13 @@ const PropertyDetail = () => {
     setTimeout(() => setShareStatus({ show: false, message: '', type: '' }), 3000);
   };
 
-  // 1. Loading State: Render this first if loading is true.
   if (loading) {
-    // The main container already correctly uses `isDark` for its background and text.
-    // The changes below are for the inner skeleton elements to explicitly use `isDark`.
-    // Ideally, Tailwind's `dark:` prefix should work if ThemeContext and Tailwind config are correct.
-    // This is a workaround for this component's skeleton if global dark mode isn't behaving.
     return (
-      <div className={`min-h-screen ${isDark ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}> {/* This line is correctly handling overall page background */}
+      <div className={`min-h-screen ${isDark ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
         <div className="container mx-auto px-4 py-8">
-          {/* Skeleton structure */}
           <div className={`h-8 w-32 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded animate-pulse mb-8`}></div>
           <div className={`h-10 w-3/4 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded animate-pulse mb-2`}></div>
           <div className={`h-6 w-1/2 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded animate-pulse mb-8`}></div>
-
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="lg:col-span-2">
               <div className={`h-96 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded-xl animate-pulse`}></div>
@@ -281,7 +292,6 @@ const PropertyDetail = () => {
             </div>
             <div className={`h-[500px] ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded-xl animate-pulse`}></div>
           </div>
-
           <div className={`h-64 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded-xl animate-pulse mb-8`}></div>
           <div className={`h-96 ${isDark ? "bg-gray-700" : "bg-gray-300"} rounded-xl animate-pulse`}></div>
         </div>
@@ -289,7 +299,6 @@ const PropertyDetail = () => {
     );
   }
 
-  // 2. Error State: If not loading and error exists.
   if (error) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${isDark ? "bg-gray-900" : "bg-gray-50"}`}>
@@ -307,7 +316,6 @@ const PropertyDetail = () => {
     );
   }
 
-  // 3. Not Found State: If not loading, no error, but no property data.
   if (!property) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${isDark ? "bg-gray-900" : "bg-gray-50"}`}>
@@ -325,8 +333,6 @@ const PropertyDetail = () => {
     );
   }
 
-  // 4. Success State: Render actual property details.
-  // ... (rest of your component remains the same)
   const mainImage = property.images && property.images.length > 0
     ? (typeof propertyService.getImageUrl === 'function'
       ? propertyService.getImageUrl(property.images[activeImage].image)
@@ -350,17 +356,14 @@ const PropertyDetail = () => {
 
   const handleWhatsAppRedirect = () => {
     if (!property.contact_phone) return;
-    // Remove any non-digit characters from the phone number
     const formattedPhone = property.contact_phone.replace(/\D/g, '');
-    // Add country code if not present (assuming Indian numbers)
     const phoneWithCountry = formattedPhone.startsWith('91') ? formattedPhone : `91${formattedPhone}`;
-    // Create WhatsApp URL
     const whatsappUrl = `https://wa.me/${phoneWithCountry}?text=Hi, I am interested in your property: ${property.title} at ${property.location}`;
     window.open(whatsappUrl, '_blank');
   };
 
   return (
-    <div className={`min-h-screen ${isDark ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}> {/* Ensure text color for light mode */}
+    <div className={`min-h-screen ${isDark ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
       <div className="container mx-auto px-4 py-6 max-w-7xl">
         {shareStatus.show && (
           <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 transition-all duration-300 ${
@@ -373,7 +376,6 @@ const PropertyDetail = () => {
           </div>
         )}
 
-        {/* Header and Action Buttons */}
         <div className="mb-6">
           <button
             onClick={() => navigate('/dashboard/properties')}
@@ -394,11 +396,8 @@ const PropertyDetail = () => {
           </div>
         </div>
 
-        {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Image Gallery */}
             <div className={`rounded-xl overflow-hidden ${isDark ? "bg-gray-800" : "bg-white"} shadow-sm`}>
               <div className="relative">
                 <div className="aspect-[16/9] overflow-hidden">
@@ -418,7 +417,7 @@ const PropertyDetail = () => {
                   </div>
                   <div className="grid grid-cols-5 gap-2">
                     {property.images.slice(0, showAllThumbnails ? property.images.length : 5).map((image, index) => (
-                      <div key={index} className={`cursor-pointer rounded-lg overflow-hidden aspect-square border-2 transition-all ${activeImage === index ? 'border-blue-500 scale-[0.98]' : isDark ? 'border-gray-700 hover:border-gray-500' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setActiveImage(index)}>
+                      <div key={image.id || index} className={`cursor-pointer rounded-lg overflow-hidden aspect-square border-2 transition-all ${activeImage === index ? 'border-blue-500 scale-[0.98]' : isDark ? 'border-gray-700 hover:border-gray-500' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setActiveImage(index)}>
                         <img src={typeof propertyService.getImageUrl === 'function' ? propertyService.getImageUrl(image.image) : image.image} alt={`${property.title} - ${index + 1}`} className="w-full h-full object-cover" onError={(e) => { e.target.src = '/placeholder.svg'; }}/>
                       </div>
                     ))}
@@ -427,17 +426,15 @@ const PropertyDetail = () => {
               )}
             </div>
 
-            {/* Property Overview */}
             <div className={`rounded-xl p-6 ${isDark ? "bg-gray-800" : "bg-white"} shadow-sm`}>
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><span className={`w-8 h-8 rounded-full ${isDark ? "bg-blue-900/50 text-blue-400" : "bg-blue-100 text-blue-600"} flex items-center justify-center`}><Home size={16} /></span>Property Overview</h2>
-              <div className="prose dark:prose-invert max-w-none"><p className="whitespace-pre-line">{property.description}</p></div>
+              <div className="prose dark:prose-invert max-w-none"><p className="whitespace-pre-line">{property.description || "No description available."}</p></div>
             </div>
-
+            
             {/* Property Details Section */}
             <div className={`rounded-xl p-6 ${isDark ? "bg-gray-800" : "bg-white"} shadow-sm`}>
               <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><span className={`w-8 h-8 rounded-full ${isDark ? "bg-blue-900/50 text-blue-400" : "bg-blue-100 text-blue-600"} flex items-center justify-center`}><Briefcase size={16} /></span>Property Details</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-                {/* Column 1 */}
                 <div className="space-y-4">
                   <h3 className="font-semibold text-lg border-b pb-2 border-gray-200 dark:border-gray-700">Basic Information</h3>
                   <ul className="space-y-3">
@@ -449,7 +446,6 @@ const PropertyDetail = () => {
                     <li className="flex justify-between items-start pt-1"><span className="text-sm text-gray-500 dark:text-gray-400">Floor</span><span className="font-medium text-sm text-right">{capitalizeAndFormatDisplayValue(property.floor)}</span></li>
                   </ul>
                 </div>
-                {/* Column 2 */}
                 <div className="space-y-4">
                   <h3 className="font-semibold text-lg border-b pb-2 border-gray-200 dark:border-gray-700">Area & Dimensions</h3>
                   <ul className="space-y-3">
@@ -458,7 +454,6 @@ const PropertyDetail = () => {
                     {(property.dimensions_length && property.dimensions_width) ? (<li className="flex justify-between items-start pt-1"><span className="text-sm text-gray-500 dark:text-gray-400">Dimensions</span><span className="font-medium text-sm text-right">{property.dimensions_length} × {property.dimensions_width} ft</span></li>) : (<li className="flex justify-between items-start pt-1"><span className="text-sm text-gray-500 dark:text-gray-400">Dimensions</span><span className="font-medium text-sm text-right">N/A</span></li>)}
                   </ul>
                 </div>
-                {/* Column 3 */}
                 <div className="space-y-4">
                   <h3 className="font-semibold text-lg border-b pb-2 border-gray-200 dark:border-gray-700">Features & Possession</h3>
                   <ul className="space-y-3">
@@ -472,33 +467,69 @@ const PropertyDetail = () => {
                 </div>
               </div>
             </div>
-          </div>
+
+            {/* Amenities Section - NEW */}
+            {property.amenities && property.amenities.length > 0 && (
+              <div className={`rounded-xl p-6 ${isDark ? "bg-gray-800" : "bg-white"} shadow-sm`}>
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <span className={`w-8 h-8 rounded-full ${isDark ? "bg-blue-900/50 text-blue-400" : "bg-blue-100 text-blue-600"} flex items-center justify-center`}>
+                    <Zap size={16} />
+                  </span>
+                  Amenities
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {property.amenities.map(amenity => (
+                    <div key={amenity.id} className={`flex items-center gap-2 p-3 rounded-lg text-sm ${isDark ? "bg-gray-700/50" : "bg-gray-50"}`}>
+                      <Check size={16} className={isDark ? "text-green-400" : "text-green-600"} />
+                      <span className="font-medium">{capitalizeAndFormatDisplayValue(amenity.name)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Specifications Section - NEW */}
+            {property.specifications && property.specifications.length > 0 && (
+              <div className={`rounded-xl p-6 ${isDark ? "bg-gray-800" : "bg-white"} shadow-sm`}>
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <span className={`w-8 h-8 rounded-full ${isDark ? "bg-blue-900/50 text-blue-400" : "bg-blue-100 text-blue-600"} flex items-center justify-center`}>
+                    <ListChecks size={16} />
+                  </span>
+                  Specifications
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                  {property.specifications.map(spec => (
+                    <div key={spec.id} className={`p-3 rounded-lg ${isDark ? "bg-gray-700/50" : "bg-gray-50"}`}>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{capitalizeAndFormatDisplayValue(spec.key)}</p>
+                      <p className="font-semibold">{capitalizeAndFormatDisplayValue(spec.value)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div> {/* End of Left Column */}
 
           {/* Right Column (Sticky) */}
           <div className="space-y-6">
             <div className={`rounded-xl p-6 ${isDark ? "bg-gray-800" : "bg-white"} shadow-sm sticky top-6`}>
-              {/* Price and Key Details */}
               <div className="flex items-center justify-between mb-6">
                 <div><p className="text-sm text-gray-500 dark:text-gray-400">Price</p><div className="text-3xl font-bold">₹{formatPrice(property.price)}</div></div>
                 {property.price_per_sqft && (<div className="text-right"><p className="text-sm text-gray-500 dark:text-gray-400">Price per sq.ft</p><div className="font-semibold">₹{formatPrice(property.price_per_sqft)}</div></div>)}
               </div>
-              {/* Key Features Grid */}
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className={`flex flex-col items-center p-3 rounded-lg ${isDark ? "bg-gray-700" : "bg-gray-50"}`}><Maximize className={`${isDark ? "text-blue-400" : "text-blue-600"} mb-1`} size={20} /><span className="text-sm text-gray-500 dark:text-gray-400">Area</span><span className="font-semibold">{property.area} sq.ft</span></div>
                 {property.property_sub_type && (<div className={`flex flex-col items-center p-3 rounded-lg ${isDark ? "bg-gray-700" : "bg-gray-50"}`}><Home className={`${isDark ? "text-blue-400" : "text-blue-600"} mb-1`} size={20} /><span className="text-sm text-gray-500 dark:text-gray-400">Type</span><span className="font-semibold">{capitalizeAndFormatDisplayValue(property.property_sub_type)}</span></div>)}
                 {property.furnishing_status && (<div className={`flex flex-col items-center p-3 rounded-lg ${isDark ? "bg-gray-700" : "bg-gray-50"}`}><DollarSign className={`${isDark ? "text-blue-400" : "text-blue-600"} mb-1`} size={20} /><span className="text-sm text-gray-500 dark:text-gray-400">Furnishing</span><span className="font-semibold">{capitalizeAndFormatDisplayValue(property.furnishing_status)}</span></div>)}
                 {property.facing && (<div className={`flex flex-col items-center p-3 rounded-lg ${isDark ? "bg-gray-700" : "bg-gray-50"}`}><Compass className={`${isDark ? "text-blue-400" : "text-blue-600"} mb-1`} size={20} /><span className="text-sm text-gray-500 dark:text-gray-400">Facing</span><span className="font-semibold">{capitalizeAndFormatDisplayValue(property.facing)}</span></div>)}
               </div>
-              {/* Possession Timeline */}
               {property.possession_timeline && (<div className={`mb-6 p-3 rounded-lg ${isDark ? "bg-blue-900/30" : "bg-blue-50"} flex items-center gap-3`}><Clock className={`${isDark ? "text-blue-400" : "text-blue-600"} flex-shrink-0`} size={20} /><div><p className="text-sm text-gray-600 dark:text-gray-300">Possession Timeline</p><p className={`font-medium ${isDark ? "text-blue-300" : "text-blue-700"}`}>{capitalizeAndFormatDisplayValue(property.possession_timeline)}</p></div></div>)}
-              {/* Contact Info */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mb-6">
                 <h3 className="font-semibold mb-4">Builder Information</h3>
                 {property.contact_name && (<div className="flex items-center gap-3 mb-3"><div className={`w-8 h-8 rounded-full ${isDark ? "bg-gray-700" : "bg-gray-100"} flex items-center justify-center flex-shrink-0`}><User size={16} className="text-gray-500 dark:text-gray-400" /></div><div><p className="text-sm text-gray-500 dark:text-gray-400">Builder Contact</p><p className="font-medium">{property.contact_name}</p></div></div>)}
                 {property.contact_phone && (<div className="flex items-center gap-3 mb-3"><div className={`w-8 h-8 rounded-full ${isDark ? "bg-gray-700" : "bg-gray-100"} flex items-center justify-center flex-shrink-0`}><Phone size={16} className="text-gray-500 dark:text-gray-400" /></div><div><p className="text-sm text-gray-500 dark:text-gray-400">Phone</p><p className="font-medium">{property.contact_phone}</p></div></div>)}
                 {property.created_at && (<div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full ${isDark ? "bg-gray-700" : "bg-gray-100"} flex items-center justify-center flex-shrink-0`}><Calendar size={16} className="text-gray-500 dark:text-gray-400" /></div><div><p className="text-sm text-gray-500 dark:text-gray-400">Listed On</p><p className="font-medium">{formatDate(property.created_at)}</p></div></div>)}
               </div>
-              {/* Action Buttons */}
               <div className="space-y-3">
                 <button 
                   onClick={handleWhatsAppRedirect} 
@@ -510,9 +541,9 @@ const PropertyDetail = () => {
                 <button onClick={handleSave} className={`w-full py-3 border rounded-lg transition duration-200 flex items-center justify-center gap-2 font-medium ${isSaved ? (isDark ? "border-blue-500 bg-blue-900/20 text-blue-400" : "border-blue-600 bg-blue-50 text-blue-600") : (isDark ? "border-blue-600 text-blue-400 hover:bg-blue-900/20" : "border-blue-600 text-blue-600 hover:bg-blue-50")}`}><Heart size={18} fill={isSaved ? "currentColor" : "none"} />{isSaved ? "Saved to Favorites" : "Save to Favorites"}</button>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
+          </div> {/* End of Right Column */}
+        </div> {/* End of Main Content Grid */}
+      </div> {/* End of Container */}
     </div>
   );
 };
