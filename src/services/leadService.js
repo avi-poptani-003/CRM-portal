@@ -1,6 +1,6 @@
 // src/services/LeadService.js
-import authService from "./authService"
-const api = authService.getApiInstance()
+import authService from "./authService";
+const api = authService.getApiInstance();
 
 const LeadService = {
   // Get leads with pagination and filters
@@ -207,6 +207,19 @@ const LeadService = {
     } catch (error) {
       console.error("Error fetching dashboard stats:", error)
       throw error
+    }
+  },
+
+  getDashboardStats: async (timeRange = 'week') => { // Default to 'week'
+    try {
+      // Pass the time_range as a query parameter
+      const response = await api.get("/leads/dashboard_stats/", {
+        params: { time_range: timeRange }
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      throw error;
     }
   },
 

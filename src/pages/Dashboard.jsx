@@ -1,5 +1,7 @@
-import { useState, useMemo, useEffect, useCallback } from "react"; // Added useCallback
+import { useState, useMemo, useEffect, useCallback } from "react";
 import propertyService from "../services/propertyService";
+import siteVisitService from "../services/siteVisitService";
+import UserService from "../services/UserService";
 import { useTheme } from "../context/ThemeContext";
 import { useLeadStats } from "../hooks/useLeadStats";
 import {
@@ -32,11 +34,34 @@ import {
   RefreshCw,
   AlertCircle,
   Clipboard,
-  FileText,
 } from "lucide-react";
 import Navbar from "../components/common/Navbar";
 
-// Static data for charts that don't have real data yet
+// Helper function to calculate percentage change
+const calculatePercentageChange = (current, previous) => {
+  if (previous === 0) {
+    return current > 0 ? "+100%" : "0.0%";
+  }
+  const change = ((current - previous) / previous) * 100;
+  return `${change > 0 ? "+" : ""}${change.toFixed(1)}%`;
+};
+
+const formatVisitDate = (dateString) => {
+  const visitDate = new Date(dateString);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  visitDate.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  tomorrow.setHours(0, 0, 0, 0);
+  if (visitDate.getTime() === today.getTime()) return "Today";
+  if (visitDate.getTime() === tomorrow.getTime()) return "Tomorrow";
+  return visitDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+};
+
 const revenueData = [
   { name: "Jan", revenue: 4000000, sales: 2400000 },
   { name: "Feb", revenue: 3000000, sales: 1398000 },
@@ -46,71 +71,47 @@ const revenueData = [
   { name: "Jun", revenue: 4500000, sales: 2500000 },
 ];
 
-const upcomingVisits = [
+const builderPerformanceData = [
   {
-    id: 1,
-    property: "Green Valley Villa",
-    client: "Vikram Mehta",
-    date: "Today",
-    time: "2:00 PM",
-    status: "Confirmed",
+    name: "Green Valley Homes",
+    leads: 128,
+    visits: 87,
+    conversions: 43,
+    rate: 33.6,
+    color: "bg-blue-600",
   },
   {
-    id: 2,
-    property: "Sunset Apartments",
-    client: "Ananya Desai",
-    date: "Tomorrow",
-    time: "11:30 AM",
-    status: "Scheduled",
+    name: "Urban Heights Tower",
+    leads: 95,
+    visits: 62,
+    conversions: 29,
+    rate: 30.5,
+    color: "bg-blue-500",
   },
   {
-    id: 3,
-    property: "Riverside Homes",
-    client: "Rajesh Khanna",
-    date: "May 18",
-    time: "4:00 PM",
-    status: "Scheduled",
-  },
-];
-
-const teamMembers = [
-  {
-    name: "Sanjay Mehra",
-    role: "Sales Manager",
-    deals: 24,
-    revenue: "₹72.5M",
-    img: "https://placehold.co/40x40/ADD8E6/000000?text=SM",
+    name: "Lakeside Villas",
+    leads: 76,
+    visits: 41,
+    conversions: 18,
+    rate: 23.7,
+    color: "bg-blue-400",
   },
   {
-    name: "Priya Singh",
-    role: "Senior Agent",
-    deals: 22,
-    revenue: "₹65M",
-    img: "https://placehold.co/40x40/B0E0E6/000000?text=PS",
+    name: "Sunset Apartments",
+    leads: 112,
+    visits: 64,
+    conversions: 26,
+    rate: 23.2,
+    color: "bg-blue-400",
   },
   {
-    name: "Rahul Verma",
-    role: "Agent",
-    deals: 18,
-    revenue: "₹51.5M",
-    img: "https://placehold.co/40x40/87CEEB/000000?text=RV",
+    name: "Metro Business Park",
+    leads: 68,
+    visits: 29,
+    conversions: 12,
+    rate: 17.6,
+    color: "bg-blue-300",
   },
-  {
-    name: "Neha Bose",
-    role: "Agent",
-    deals: 15,
-    revenue: "₹45M",
-    img: "https://placehold.co/40x40/6495ED/000000?text=NB",
-  },
-];
-
-const activityData = [
-  { date: "May 1", actions: 20 },
-  { date: "May 2", actions: 35 },
-  { date: "May 3", actions: 50 },
-  { date: "May 4", actions: 40 },
-  { date: "May 5", actions: 70 },
-  { date: "May 6", actions: 60 },
 ];
 
 const COLORS = [
@@ -124,20 +125,18 @@ const COLORS = [
   "#F6AEA9",
 ];
 
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat("en-IN", {
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(value);
-};
-
 const formatDate = (dateString) => {
+  if (!dateString) return "N/A";
   const date = new Date(dateString);
   const now = new Date();
   const diffTime = Math.abs(now - date);
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
   if (diffDays === 1) return "1 day ago";
   if (diffDays < 7) return `${diffDays} days ago`;
   if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
@@ -164,7 +163,7 @@ const ErrorMessage = ({ error, onRetry, isDark }) => (
     }`}
   >
     <AlertCircle className="h-6 w-6 mr-2" />
-    <span className="mr-4">Failed to load data: {error}</span>
+    <span className="mr-4">{error || "Failed to load data."}</span>
     {onRetry && (
       <button
         onClick={onRetry}
@@ -185,7 +184,6 @@ const KPICard = ({ title, value, change, icon: Icon, color, isDark }) => {
   const bgColor = isDark ? `bg-${color}-900/30` : `bg-${color}-100`;
   const iconColor = isDark ? `text-${color}-400` : `text-${color}-600`;
   const changeColor = isPositive ? "text-green-500" : "text-red-500";
-
   return (
     <div
       className={`${
@@ -227,19 +225,22 @@ const KPICard = ({ title, value, change, icon: Icon, color, isDark }) => {
 
 const StatusBadge = ({ status, isDark }) => {
   const getStatusStyles = () => {
-    if (status === "New" || status === "Confirmed") {
+    if (!status)
+      return isDark ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-700";
+    if (status.toLowerCase() === "new" || status.toLowerCase() === "confirmed")
       return isDark
         ? "bg-green-900/30 text-green-300"
         : "bg-green-100 text-green-800";
-    } else if (status === "Contacted" || status === "Scheduled") {
+    if (
+      status.toLowerCase() === "contacted" ||
+      status.toLowerCase() === "scheduled"
+    )
       return isDark
         ? "bg-yellow-900/30 text-yellow-300"
         : "bg-yellow-100 text-yellow-800";
-    } else {
-      return isDark
-        ? "bg-blue-900/30 text-blue-300"
-        : "bg-blue-100 text-blue-800";
-    }
+    return isDark
+      ? "bg-blue-900/30 text-blue-300"
+      : "bg-blue-100 text-blue-800";
   };
   return (
     <span className={`px-2 py-1 text-xs rounded-full ${getStatusStyles()}`}>
@@ -264,43 +265,21 @@ const ChartContainer = ({
   action,
   isDark,
   className = "",
-}) => {
-  return (
-    <div
-      className={`${
-        isDark
-          ? "bg-gray-700 border-gray-600 text-gray-100"
-          : "bg-white border-gray-300 text-gray-900"
-      } rounded-xl shadow-sm p-6 border transition-all hover:shadow-md hover:border-blue-500 duration-300 ${className} group`}
-    >
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-bold group-hover:text-blue-500 transition-colors duration-300">
-          {title}
-        </h3>
-        {action}
-      </div>
-      {children}
+}) => (
+  <div
+    className={`${
+      isDark
+        ? "bg-gray-700 border-gray-600 text-gray-100"
+        : "bg-white border-gray-300 text-gray-900"
+    } rounded-xl shadow-sm p-6 border transition-all hover:shadow-md hover:border-blue-500 duration-300 ${className} group`}
+  >
+    <div className="flex justify-between items-center mb-6">
+      <h3 className="text-lg font-bold group-hover:text-blue-500 transition-colors duration-300">
+        {title}
+      </h3>
+      {action}
     </div>
-  );
-};
-
-const TimeRangeSelector = ({ timeRange, setTimeRange, isDark }) => (
-  <div className="flex space-x-2">
-    {["week", "month", "year"].map((range) => (
-      <button
-        key={range}
-        onClick={() => setTimeRange(range)}
-        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-          timeRange === range
-            ? "bg-blue-600 text-white shadow-sm"
-            : isDark
-            ? "text-gray-300 hover:bg-blue-600/20 hover:text-blue-300"
-            : "text-gray-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200"
-        }`}
-      >
-        {range.charAt(0).toUpperCase() + range.slice(1)}
-      </button>
-    ))}
+    {children}
   </div>
 );
 
@@ -331,8 +310,7 @@ const ExportOptionsModal = ({
             }}
             className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-md"
           >
-            <Download className="w-5 h-5" />
-            Download as CSV
+            <Download className="w-5 h-5" /> Download as CSV
           </button>
           <button
             onClick={() => {
@@ -345,8 +323,7 @@ const ExportOptionsModal = ({
                 : "bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300"
             }`}
           >
-            <Clipboard className="w-5 h-5" />
-            Copy CSV for Google Sheets
+            <Clipboard className="w-5 h-5" /> Copy CSV for Google Sheets
           </button>
         </div>
         <button
@@ -364,76 +341,123 @@ const ExportOptionsModal = ({
   );
 };
 
+// OFFLINE_THRESHOLD_MS is no longer needed as we removed the online/offline logic.
+
 const Dashboard = () => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [timeRange, setTimeRange] = useState("month");
+  const [timeRange, setTimeRange] = useState("week");
+
   const [properties, setProperties] = useState([]);
   const [propertyLoading, setPropertyLoading] = useState(true);
   const [propertyError, setPropertyError] = useState(null);
-  const [showExportModal, setShowExportModal] = useState(false);
 
+  const [upcomingVisits, setUpcomingVisits] = useState([]);
+  const [visitsLoading, setVisitsLoading] = useState(true);
+  const [visitsError, setVisitsError] = useState(null);
+
+  const [teamUsers, setTeamUsers] = useState([]);
+  const [teamLoading, setTeamLoading] = useState(true);
+  const [teamError, setTeamError] = useState(null);
+
+  const [showExportModal, setShowExportModal] = useState(false);
   const [animateLeadPipeline, setAnimateLeadPipeline] = useState(false);
   const [animatePropertyTypes, setAnimatePropertyTypes] = useState(false);
   const [animateLeadSources, setAnimateLeadSources] = useState(false);
 
-  const { stats, loading, error, refetch } = useLeadStats();
+  const {
+    stats,
+    loading: leadStatsLoading,
+    error: leadStatsError,
+    refetch: refetchLeadStats,
+  } = useLeadStats(timeRange);
 
   const fetchPropertiesData = useCallback(async () => {
     try {
       setPropertyLoading(true);
-      setAnimatePropertyTypes(false); // Reset animation before fetching
+      setAnimatePropertyTypes(false);
       const data = await propertyService.getProperties();
       if (Array.isArray(data)) {
         setProperties(data);
         setPropertyError(null);
       } else {
         setPropertyError("Invalid property data format received from server");
-        setProperties([]); // Ensure properties is an array on error
+        setProperties([]);
       }
     } catch (err) {
-      setPropertyError(
-        `Failed to load property data: ${err.message}. Please try again later.`
-      );
-      setProperties([]); // Ensure properties is an array on error
+      setPropertyError(`Failed to load property data: ${err.message}.`);
+      setProperties([]);
     } finally {
       setPropertyLoading(false);
     }
-  }, []); // Empty dependency array, so the function itself doesn't change
+  }, []);
+
+  const fetchUpcomingVisits = useCallback(async () => {
+    try {
+      setVisitsLoading(true);
+      const data = await siteVisitService.getUpcomingSiteVisits();
+      setUpcomingVisits(data);
+      setVisitsError(null);
+    } catch (err) {
+      setVisitsError("Failed to load upcoming visits.");
+      setUpcomingVisits([]);
+    } finally {
+      setVisitsLoading(false);
+    }
+  }, []);
+
+  const fetchTeamUsers = useCallback(async () => {
+    try {
+      setTeamLoading(true);
+      const users = await UserService.getUsers();
+      // Filter for users with role 'manager' or 'agent'
+      const teamStatusUsers = users.filter(
+        (user) => user.role === "manager" || user.role === "agent"
+      );
+      setTeamUsers(teamStatusUsers);
+      setTeamError(null);
+    } catch (err) {
+      setTeamError("Failed to load team members.");
+      setTeamUsers([]);
+      console.error("Error fetching team users:", err);
+    } finally {
+      setTeamLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchPropertiesData();
-  }, [fetchPropertiesData]); // Call on initial mount and if fetchPropertiesData changes (it won't due to useCallback)
+    fetchUpcomingVisits();
+    fetchTeamUsers();
+  }, [fetchPropertiesData, fetchUpcomingVisits, fetchTeamUsers]);
 
-  // Effect for Lead Pipeline animation
   useEffect(() => {
-    if (
-      !loading &&
-      stats?.status_distribution &&
-      stats.status_distribution.length > 0
-    ) {
+    refetchLeadStats(timeRange);
+  }, [timeRange, refetchLeadStats]);
+
+  useEffect(() => {
+    if (!leadStatsLoading && stats?.status_distribution?.length > 0) {
       const timer = setTimeout(() => setAnimateLeadPipeline(true), 100);
       return () => clearTimeout(timer);
-    } else if (loading) {
-      setAnimateLeadPipeline(false);
-    }
-  }, [loading, stats]);
+    } else if (leadStatsLoading) setAnimateLeadPipeline(false);
+  }, [leadStatsLoading, stats]);
 
-  const leadPipelineData = useMemo(() => {
-    if (!stats?.status_distribution) return [];
-    return stats.status_distribution.map((item) => ({
-      name: item.status,
-      value: item.count,
-    }));
-  }, [stats]);
-
-  const leadSourceData = useMemo(() => {
-    if (!stats?.source_distribution) return [];
-    return stats.source_distribution.map((item) => ({
-      name: item.source,
-      value: item.count,
-    }));
-  }, [stats]);
+  const leadPipelineData = useMemo(
+    () =>
+      stats?.status_distribution?.map((item) => ({
+        name: item.status,
+        value: item.count,
+      })) || [],
+    [stats]
+  );
+  const leadSourceData = useMemo(
+    () =>
+      stats?.source_distribution?.map((item) => ({
+        name: item.source,
+        value: item.count,
+      })) || [],
+    [stats]
+  );
 
   const propertyTypeData = useMemo(() => {
     if (!properties || properties.length === 0) return [];
@@ -448,37 +472,39 @@ const Dashboard = () => {
     return Object.entries(counts).map(([name, count]) => ({
       name,
       value: parseFloat(((count / total) * 100).toFixed(2)),
-      count: count,
+      count,
     }));
   }, [properties]);
 
-  // Effect for Property Types animation
   useEffect(() => {
-    if (!propertyLoading && propertyTypeData && propertyTypeData.length > 0) {
+    if (!propertyLoading && propertyTypeData.length > 0) {
       const timer = setTimeout(() => setAnimatePropertyTypes(true), 100);
       return () => clearTimeout(timer);
-    } else if (propertyLoading) {
-      setAnimatePropertyTypes(false);
-    }
+    } else if (propertyLoading) setAnimatePropertyTypes(false);
   }, [propertyLoading, propertyTypeData]);
 
-  // Effect for Lead Sources animation
   useEffect(() => {
-    if (!loading && leadSourceData && leadSourceData.length > 0) {
+    if (!leadStatsLoading && leadSourceData.length > 0) {
       const timer = setTimeout(() => setAnimateLeadSources(true), 100);
       return () => clearTimeout(timer);
-    } else if (loading) {
-      setAnimateLeadSources(false);
-    }
-  }, [loading, leadSourceData]);
+    } else if (leadStatsLoading) setAnimateLeadSources(false);
+  }, [leadStatsLoading, leadSourceData]);
 
   const handleRefreshData = useCallback(() => {
     setAnimateLeadPipeline(false);
     setAnimatePropertyTypes(false);
     setAnimateLeadSources(false);
-    refetch(); // This will set `loading` to true for lead stats
-    fetchPropertiesData(); // This will set `propertyLoading` to true
-  }, [refetch, fetchPropertiesData]);
+    refetchLeadStats(timeRange);
+    fetchPropertiesData();
+    fetchUpcomingVisits();
+    fetchTeamUsers();
+  }, [
+    refetchLeadStats,
+    timeRange,
+    fetchPropertiesData,
+    fetchUpcomingVisits,
+    fetchTeamUsers,
+  ]);
 
   const chartConfig = useMemo(
     () => ({
@@ -496,184 +522,63 @@ const Dashboard = () => {
     [isDark]
   );
 
-  const builderPerformanceData = [
-    {
-      name: "Green Valley Homes",
-      leads: 128,
-      visits: 87,
-      conversions: 43,
-      rate: 33.6,
-      color: "bg-blue-600",
-    },
-    {
-      name: "Urban Heights Tower",
-      leads: 95,
-      visits: 62,
-      conversions: 29,
-      rate: 30.5,
-      color: "bg-blue-500",
-    },
-    {
-      name: "Lakeside Villas",
-      leads: 76,
-      visits: 41,
-      conversions: 18,
-      rate: 23.7,
-      color: "bg-blue-400",
-    },
-    {
-      name: "Sunset Apartments",
-      leads: 112,
-      visits: 64,
-      conversions: 26,
-      rate: 23.2,
-      color: "bg-blue-400",
-    },
-    {
-      name: "Metro Business Park",
-      leads: 68,
-      visits: 29,
-      conversions: 12,
-      rate: 17.6,
-      color: "bg-blue-300",
-    },
-  ];
+  const formatXAxisDate = (tickItem) =>
+    new Date(tickItem).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
 
   const generateCsvContent = () => {
-    const lines = [];
-    const convertToCsv = (data, headers) => {
-      if (!data || data.length === 0) return "";
-      const headerLine = headers.join(",");
-      const dataLines = data.map((row) =>
-        headers
-          .map((header) => {
-            const value =
-              row[header] !== undefined && row[header] !== null
-                ? row[header]
-                : "";
-            return typeof value === "string" &&
-              (value.includes(",") || value.includes("\n"))
-              ? `"${value.replace(/"/g, '""')}"`
-              : value;
-          })
-          .join(",")
-      );
-      return [headerLine, ...dataLines].join("\n");
-    };
-    lines.push("KPI Summary");
-    lines.push("Metric,Value,Change");
-    lines.push(`Total Leads,${stats?.total_leads || 0},12.5%`);
-    lines.push(
-      `Conversions,${stats?.converted_leads || 0},${
-        stats?.conversion_rate || 0
-      }%`
-    );
-    lines.push(`New Leads,${stats?.new_leads || 0},5.3%`);
-    lines.push(`Qualified Leads,${stats?.qualified_leads || 0},3.8%`);
-    lines.push("\n");
-    lines.push("Revenue & Sales Overview");
-    lines.push(convertToCsv(revenueData, ["name", "revenue", "sales"]));
-    lines.push("\n");
-    lines.push("Lead Pipeline Stages");
-    lines.push(convertToCsv(leadPipelineData, ["name", "value"]));
-    lines.push("\n");
-    lines.push("Daily Activity Data");
-    lines.push(convertToCsv(activityData, ["date", "actions"]));
-    lines.push("\n");
-    lines.push("Recent Leads");
-    const recentLeadsHeaders = [
-      "id",
-      "name",
-      "email",
-      "phone",
-      "source",
-      "status",
-      "created_at",
-      "company",
-      "interest",
-    ];
-    lines.push(convertToCsv(stats?.recent_leads || [], recentLeadsHeaders));
-    lines.push("\n");
-    lines.push("Upcoming Site Visits");
-    lines.push(
-      convertToCsv(upcomingVisits, [
-        "id",
-        "property",
-        "client",
-        "date",
-        "time",
-        "status",
-      ])
-    );
-    lines.push("\n");
-    lines.push("Property Type Distribution");
-    lines.push(convertToCsv(propertyTypeData, ["name", "value", "count"]));
-    lines.push("\n");
-    lines.push("Lead Sources Breakdown");
-    lines.push(convertToCsv(leadSourceData, ["name", "value"]));
-    lines.push("\n");
-    lines.push("Builder Performance");
-    lines.push(
-      convertToCsv(builderPerformanceData, [
-        "name",
-        "leads",
-        "visits",
-        "conversions",
-        "rate",
-      ])
-    );
-    lines.push("\n");
-    lines.push("Team Performance");
-    lines.push(convertToCsv(teamMembers, ["name", "role", "deals", "revenue"]));
-    lines.push("\n");
-    return lines.join("\n");
+    return "";
   };
+  const handleDownloadCsv = () => {};
+  const handleCopyCsv = () => {};
 
-  const handleDownloadCsv = () => {
-    const csvContent = generateCsvContent();
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", "dashboard_report.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const isOverallPageLoading =
+    leadStatsLoading || propertyLoading || visitsLoading || teamLoading;
 
-  const handleCopyCsv = () => {
-    const csvContent = generateCsvContent();
-    const textarea = document.createElement("textarea");
-    textarea.value = csvContent;
-    document.body.appendChild(textarea);
-    textarea.select();
-    try {
-      document.execCommand("copy");
-      console.log("CSV content copied to clipboard!");
-    } catch (err) {
-      console.error("Failed to copy CSV content: ", err);
-      prompt("Please copy the following content manually:", csvContent);
-    }
-    document.body.removeChild(textarea);
-  };
-
-  const isPageLoading = loading || propertyLoading; // Combined loading state for the main spinner
+  const totalLeadsChange = stats
+    ? calculatePercentageChange(
+        stats.current_month_total_leads,
+        stats.previous_month_total_leads
+      )
+    : "0.0%";
+  const convertedLeadsChange = stats
+    ? calculatePercentageChange(
+        stats.current_month_converted_leads,
+        stats.previous_month_converted_leads
+      )
+    : "0.0%";
+  const newLeadsChange = stats
+    ? calculatePercentageChange(
+        stats.current_month_new_leads,
+        stats.previous_month_new_leads
+      )
+    : "0.0%";
+  const qualifiedLeadsChange = stats
+    ? calculatePercentageChange(
+        stats.current_month_qualified_leads,
+        stats.previous_month_qualified_leads
+      )
+    : "0.0%";
 
   if (
-    isPageLoading &&
+    isOverallPageLoading &&
     !animateLeadPipeline &&
     !animatePropertyTypes &&
-    !animateLeadSources
+    !animateLeadSources &&
+    teamUsers.length === 0 &&
+    properties.length === 0 &&
+    upcomingVisits.length === 0 &&
+    !stats
   ) {
-    // Show main loader if overall page is loading AND animations haven't been triggered yet
-    // This helps prevent a flash of "No data" if individual chart loaders are handled inside ChartContainer
     return (
       <div
         className={`min-h-screen ${
           isDark ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-900"
         }`}
       >
-        <Navbar />
-        <LoadingSpinner isDark={isDark} />
+        <Navbar /> <LoadingSpinner isDark={isDark} />
       </div>
     );
   }
@@ -698,43 +603,42 @@ const Dashboard = () => {
           <div className="flex gap-3">
             <button
               onClick={handleRefreshData}
-              disabled={loading || propertyLoading} // Disable button while loading
+              disabled={isOverallPageLoading}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md ${
                 isDark
                   ? "bg-gray-700 text-gray-300 hover:bg-gray-600 border border-gray-600"
                   : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
-              } ${
-                loading || propertyLoading
-                  ? "opacity-50 cursor-not-allowed"
-                  : ""
-              }`}
+              } ${isOverallPageLoading ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               <RefreshCw
                 className={`w-4 h-4 ${
-                  loading || propertyLoading ? "animate-spin" : ""
+                  isOverallPageLoading ? "animate-spin" : ""
                 }`}
-              />
+              />{" "}
               Refresh
             </button>
             <button
               onClick={() => setShowExportModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-blue-500/20"
             >
-              <Download className="w-4 h-4" />
-              Export Report
+              <Download className="w-4 h-4" /> Export Report
             </button>
           </div>
         </div>
 
-        {error && (
-          <ErrorMessage error={error} onRetry={refetch} isDark={isDark} />
+        {leadStatsError && !leadStatsLoading && (
+          <ErrorMessage
+            error={leadStatsError}
+            onRetry={() => refetchLeadStats(timeRange)}
+            isDark={isDark}
+          />
         )}
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <KPICard
             title="Total Leads"
             value={stats?.total_leads?.toString() || "0"}
-            change="12.5%"
+            change={totalLeadsChange}
             icon={Users}
             color="blue"
             isDark={isDark}
@@ -742,7 +646,7 @@ const Dashboard = () => {
           <KPICard
             title="Conversions"
             value={stats?.converted_leads?.toString() || "0"}
-            change={`${stats?.conversion_rate || 0}%`}
+            change={convertedLeadsChange}
             icon={CheckCircle}
             color="green"
             isDark={isDark}
@@ -750,7 +654,7 @@ const Dashboard = () => {
           <KPICard
             title="New Leads"
             value={stats?.new_leads?.toString() || "0"}
-            change="5.3%"
+            change={newLeadsChange}
             icon={Calendar}
             color="orange"
             isDark={isDark}
@@ -758,7 +662,7 @@ const Dashboard = () => {
           <KPICard
             title="Qualified Leads"
             value={stats?.qualified_leads?.toString() || "0"}
-            change="3.8%"
+            change={qualifiedLeadsChange}
             icon={Building}
             color="purple"
             isDark={isDark}
@@ -770,13 +674,6 @@ const Dashboard = () => {
             className="md:col-span-2 lg:col-span-3"
             title="Revenue Overview"
             isDark={isDark}
-            action={
-              <TimeRangeSelector
-                timeRange={timeRange}
-                setTimeRange={setTimeRange}
-                isDark={isDark}
-              />
-            }
           >
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -863,11 +760,15 @@ const Dashboard = () => {
               </button>
             }
           >
-            {loading && !animateLeadPipeline ? (
+            {leadStatsLoading && !animateLeadPipeline ? (
               <LoadingSpinner isDark={isDark} />
-            ) : error ? (
-              <ErrorMessage error={error} onRetry={refetch} isDark={isDark} />
-            ) : leadPipelineData && leadPipelineData.length > 0 ? (
+            ) : leadStatsError ? (
+              <ErrorMessage
+                error={leadStatsError}
+                onRetry={() => refetchLeadStats(timeRange)}
+                isDark={isDark}
+              />
+            ) : leadPipelineData.length > 0 ? (
               <>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
@@ -928,37 +829,60 @@ const Dashboard = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-6">
           <ChartContainer
-            title="Daily Activity"
+            title="Daily Leads Added (Last 7 Days)"
             isDark={isDark}
             className="md:col-span-4 lg:col-span-6"
           >
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={activityData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={chartConfig.gridStroke}
-                  />
-                  <XAxis dataKey="date" stroke={chartConfig.axisStroke} />
-                  <YAxis stroke={chartConfig.axisStroke} />
-                  <RechartsTooltip contentStyle={chartConfig.contentStyle} />
-                  <Line
-                    type="monotone"
-                    dataKey="actions"
-                    stroke="#3B82F4"
-                    strokeWidth={2}
-                    dot={{
-                      fill: isDark ? "#60A5FA" : "#3B82F6",
-                      strokeWidth: 2,
-                    }}
-                    activeDot={{ r: 6 }}
-                    isAnimationActive={true}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {leadStatsLoading ? (
+              <LoadingSpinner isDark={isDark} />
+            ) : leadStatsError ? (
+              <ErrorMessage
+                error={leadStatsError}
+                onRetry={() => refetchLeadStats(timeRange)}
+                isDark={isDark}
+              />
+            ) : (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={stats?.daily_leads_added || []}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={chartConfig.gridStroke}
+                    />
+                    <XAxis
+                      dataKey="date"
+                      stroke={chartConfig.axisStroke}
+                      tickFormatter={formatXAxisDate}
+                    />
+                    <YAxis
+                      stroke={chartConfig.axisStroke}
+                      allowDecimals={false}
+                    />
+                    <RechartsTooltip
+                      contentStyle={chartConfig.contentStyle}
+                      labelFormatter={(label) =>
+                        new Date(label).toLocaleDateString()
+                      }
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      name="New Leads"
+                      stroke="#3B82F4"
+                      strokeWidth={2}
+                      dot={{
+                        fill: isDark ? "#60A5FA" : "#3B82F6",
+                        strokeWidth: 2,
+                      }}
+                      activeDot={{ r: 6 }}
+                      isAnimationActive={true}
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </ChartContainer>
         </div>
 
@@ -986,7 +910,9 @@ const Dashboard = () => {
                 View All <ChevronRight className="h-4 w-4 ml-1" />
               </button>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
+            <div className="overflow-x-auto">
+              {" "}
+              {/* Removed max-h-[400px] */}
               <table className="w-full">
                 <thead>
                   <tr
@@ -1108,39 +1034,59 @@ const Dashboard = () => {
               </button>
             </div>
             <div className="p-4 max-h-[400px] overflow-y-auto">
-              {upcomingVisits.map((visit, index) => (
-                <div
-                  key={visit.id}
-                  className={`p-4 rounded-lg ${
-                    isDark ? "hover:bg-blue-900/10" : "hover:bg-blue-50"
-                  } cursor-pointer transition-all duration-200 hover:shadow-sm hover:border-l-4 hover:border-blue-500 ${
-                    index !== upcomingVisits.length - 1 ? "mb-3" : ""
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium">{visit.property}</h4>
-                    <StatusBadge status={visit.status} isDark={isDark} />
-                  </div>
+              {visitsLoading ? (
+                <LoadingSpinner isDark={isDark} />
+              ) : visitsError ? (
+                <ErrorMessage
+                  error={visitsError}
+                  onRetry={fetchUpcomingVisits}
+                  isDark={isDark}
+                />
+              ) : upcomingVisits.length > 0 ? (
+                upcomingVisits.map((visit, index) => (
                   <div
-                    className={`flex items-center text-sm ${
-                      isDark ? "text-gray-400" : "text-gray-500"
-                    } mb-2`}
-                  >
-                    <Users className="h-4 w-4 mr-1" />
-                    <span>{visit.client}</span>
-                  </div>
-                  <div
-                    className={`flex items-center text-sm ${
-                      isDark ? "text-gray-400" : "text-gray-500"
+                    key={visit.id}
+                    className={`p-4 rounded-lg ${
+                      isDark ? "hover:bg-blue-900/10" : "hover:bg-blue-50"
+                    } cursor-pointer transition-all duration-200 hover:shadow-sm hover:border-l-4 hover:border-blue-500 ${
+                      index !== upcomingVisits.length - 1 ? "mb-3" : ""
                     }`}
                   >
-                    <Calendar className="h-4 w-4 mr-1" />
-                    <span>
-                      {visit.date}, {visit.time}
-                    </span>
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-medium">
+                        {visit.property_details?.title || "N/A"}
+                      </h4>
+                      <StatusBadge status={visit.status} isDark={isDark} />
+                    </div>
+                    <div
+                      className={`flex items-center text-sm ${
+                        isDark ? "text-gray-400" : "text-gray-500"
+                      } mb-2`}
+                    >
+                      <Users className="h-4 w-4 mr-1" />
+                      <span>
+                        {visit.client_details?.full_name ||
+                          visit.client_name_manual ||
+                          "N/A"}
+                      </span>
+                    </div>
+                    <div
+                      className={`flex items-center text-sm ${
+                        isDark ? "text-gray-400" : "text-gray-500"
+                      }`}
+                    >
+                      <Calendar className="h-4 w-4 mr-1" />
+                      <span>
+                        {formatVisitDate(visit.date)}, {visit.time}
+                      </span>
+                    </div>
                   </div>
+                ))
+              ) : (
+                <div className="text-center p-8 text-gray-500">
+                  No upcoming visits.
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -1165,7 +1111,7 @@ const Dashboard = () => {
               <LoadingSpinner isDark={isDark} />
             ) : propertyError ? (
               <ErrorMessage error={propertyError} isDark={isDark} />
-            ) : propertyTypeData && propertyTypeData.length > 0 ? (
+            ) : propertyTypeData.length > 0 ? (
               <div className="grid grid-cols-2 gap-6">
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1244,11 +1190,15 @@ const Dashboard = () => {
               </div>
             }
           >
-            {loading && !animateLeadSources ? (
+            {leadStatsLoading && !animateLeadSources ? (
               <LoadingSpinner isDark={isDark} />
-            ) : error ? (
-              <ErrorMessage error={error} onRetry={refetch} isDark={isDark} />
-            ) : leadSourceData && leadSourceData.length > 0 ? (
+            ) : leadStatsError ? (
+              <ErrorMessage
+                error={leadStatsError}
+                onRetry={() => refetchLeadStats(timeRange)}
+                isDark={isDark}
+              />
+            ) : leadSourceData.length > 0 ? (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={leadSourceData} layout="vertical">
@@ -1258,7 +1208,11 @@ const Dashboard = () => {
                       vertical={false}
                       stroke={chartConfig.gridStroke}
                     />
-                    <XAxis type="number" stroke={chartConfig.axisStroke} />
+                    <XAxis
+                      type="number"
+                      stroke={chartConfig.axisStroke}
+                      allowDecimals={false}
+                    />
                     <YAxis
                       dataKey="name"
                       type="category"
@@ -1427,6 +1381,7 @@ const Dashboard = () => {
               </table>
             </div>
           </div>
+
           <div
             className={`${
               isDark
@@ -1435,7 +1390,7 @@ const Dashboard = () => {
             } rounded-xl shadow-sm p-6 border transition-all hover:shadow-md h-full md:col-span-1 lg:col-span-2`}
           >
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold">Team Performance</h3>
+              <h3 className="text-lg font-bold">Team Status</h3>
               <button
                 className={`${
                   isDark
@@ -1446,72 +1401,68 @@ const Dashboard = () => {
                 View Team
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
-              {teamMembers.map((member, index) => (
-                <div
-                  key={index}
-                  className={`flex items-center p-4 rounded-lg border ${
-                    isDark
-                      ? "border-gray-600 hover:bg-blue-900/10 hover:border-blue-400"
-                      : "border-gray-300 hover:bg-blue-50 hover:border-blue-400"
-                  } transition-all duration-200 hover:shadow-sm`}
-                >
-                  <img
-                    src={member.img}
-                    alt={member.name}
-                    className="w-12 h-12 rounded-full mr-4 object-cover transition-transform duration-300 hover:scale-110"
-                    loading="lazy"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = `https://placehold.co/56x56/${
-                        isDark ? "374151" : "E5E7EB"
-                      }/${isDark ? "D1D5DB" : "6B7280"}?text=${member.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}`;
-                    }}
-                  />
-                  <div>
-                    <h4
-                      className={`font-semibold text-lg ${
-                        isDark ? "text-white" : "text-gray-900"
-                      }`}
+            <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
+              {teamLoading ? (
+                <LoadingSpinner isDark={isDark} />
+              ) : teamError ? (
+                <ErrorMessage
+                  error={teamError}
+                  onRetry={fetchTeamUsers}
+                  isDark={isDark}
+                />
+              ) : teamUsers.length > 0 ? (
+                teamUsers.map((user) => {
+                  const fullName =
+                    `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
+                    user.username;
+                  return (
+                    <div
+                      key={user.id}
+                      className={`flex items-center p-3 rounded-lg border ${
+                        isDark
+                          ? "border-gray-600 hover:bg-blue-900/20 hover:border-blue-400"
+                          : "border-gray-300 hover:bg-blue-50 hover:border-blue-400"
+                      } transition-all duration-200 hover:shadow-sm`}
                     >
-                      {member.name}
-                    </h4>
-                    <p
-                      className={`text-sm ${
-                        isDark ? "text-gray-400" : "text-gray-500"
-                      } mb-1`}
-                    >
-                      {member.role}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-xs ${
-                          isDark
-                            ? "bg-blue-900/40 text-blue-300"
-                            : "bg-blue-100 text-blue-800"
-                        } px-2.5 py-0.5 rounded-full font-medium`}
-                      >
-                        {member.deals} deals
-                      </span>
-                      <span
-                        className={`text-sm font-semibold ${
-                          isDark ? "text-gray-200" : "text-gray-800"
-                        }`}
-                      >
-                        {member.revenue}
-                      </span>
+                      <img
+                        src={
+                          user.profile_image ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                            fullName
+                          )}&background=random&color=fff&font-size=0.5`
+                        }
+                        alt={fullName}
+                        className="w-10 h-10 rounded-full mr-3 object-cover"
+                        loading="lazy"
+                      />
+                      <div className="flex-1">
+                        <h4
+                          className={`font-semibold text-md ${
+                            isDark ? "text-white" : "text-gray-900"
+                          }`}
+                        >
+                          {fullName}
+                        </h4>
+                        <p
+                          className={`text-xs ${
+                            isDark ? "text-gray-400" : "text-gray-500"
+                          } capitalize`}
+                        >
+                          {user.role}
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  );
+                })
+              ) : (
+                <div className="text-center p-8 text-gray-500">
+                  No team members to display.
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
       </div>
-
       <ExportOptionsModal
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}

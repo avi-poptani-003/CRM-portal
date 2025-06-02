@@ -26,16 +26,53 @@ const Sidebar = () => {
   const isDark = theme === "dark";
 
   const navItems = [
-    { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "manager", "agent"] },
-    { path: "/dashboard/leads", label: "Leads", icon: Users, roles: ["admin", "manager", "agent"] },
-    { path: "/dashboard/properties", label: "Properties", icon: Building2, roles: ["admin", "manager", "agent"] },
-    { path: "/dashboard/site-visits", label: "Site Visits", icon: CalendarCheck, roles: ["admin", "manager", "agent"] },
-    { path: "/dashboard/team", label: "Team Management", icon: UserCog, roles: ["admin", "manager"] },
-    { path: "/dashboard/analytics", label: "Analytics", icon: BarChart3, roles: ["admin", "manager"] },
-    { path: "/dashboard/settings", label: "Settings", icon: Settings, roles: ["admin", "manager", "agent"] },
+    {
+      path: "/dashboard",
+      label: "Dashboard",
+      icon: LayoutDashboard,
+      roles: ["admin", "manager", "agent"],
+    },
+    {
+      path: "/dashboard/leads",
+      label: "Leads",
+      icon: Users,
+      roles: ["admin", "manager", "agent"],
+    },
+    {
+      path: "/dashboard/properties",
+      label: "Properties",
+      icon: Building2,
+      roles: ["admin", "manager", "agent"],
+    },
+    {
+      path: "/dashboard/site-visits",
+      label: "Site Visits",
+      icon: CalendarCheck,
+      roles: ["admin", "manager", "agent"],
+    },
+    {
+      path: "/dashboard/team",
+      label: "Team Management",
+      icon: UserCog,
+      roles: ["admin"],
+    },
+    {
+      path: "/dashboard/analytics",
+      label: "Analytics",
+      icon: BarChart3,
+      roles: ["admin", "manager"],
+    },
+    {
+      path: "/dashboard/settings",
+      label: "Settings",
+      icon: Settings,
+      roles: ["admin", "manager", "agent"],
+    },
   ];
 
-  const filteredNavItems = navItems.filter((item) => item.roles.includes(userRole));
+  const filteredNavItems = navItems.filter((item) =>
+    item.roles.includes(userRole)
+  );
 
   useEffect(() => {
     const handleResize = () => {
@@ -72,12 +109,14 @@ const Sidebar = () => {
       <motion.aside
         initial={{ width: isMobileView ? 0 : "4.375rem" }}
         animate={{
-          width: isMobileView 
-            ? (isMobileMenuOpen ? "16rem" : 0)
-            : (isHovered ? "16rem" : "4.375rem"),
-          x: isMobileView 
-            ? (isMobileMenuOpen ? 0 : "-100%") 
-            : 0
+          width: isMobileView
+            ? isMobileMenuOpen
+              ? "16rem"
+              : 0
+            : isHovered
+            ? "16rem"
+            : "4.375rem",
+          x: isMobileView ? (isMobileMenuOpen ? 0 : "-100%") : 0,
         }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
         className={`fixed top-0 left-0 h-screen z-40 ${
@@ -88,9 +127,11 @@ const Sidebar = () => {
       >
         {/* Logo */}
         <div>
-          <div className={`h-[72.5px] flex items-center border-b ${
-            isDark ? "border-gray-800" : "border-gray-300"
-          }`}>
+          <div
+            className={`h-[72.5px] flex items-center border-b ${
+              isDark ? "border-gray-800" : "border-gray-300"
+            }`}
+          >
             <div className="min-w-[70px] flex items-center justify-center">
               <img src="/vite.svg" alt="Logo" className="h-7 w-7" />
             </div>
@@ -105,14 +146,18 @@ const Sidebar = () => {
           </div>
 
           {/* Profile */}
-          <div className={`h-[70px] flex items-center border-b ${
-            isDark ? "border-gray-800" : "border-gray-300"
-          }`}>
+          <div
+            className={`h-[70px] flex items-center border-b ${
+              isDark ? "border-gray-800" : "border-gray-300"
+            }`}
+          >
             <div className="min-w-[70px] flex items-center justify-center">
               <motion.div
                 whileHover={{ scale: 1.1 }}
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                  isDark ? "bg-gray-700 text-gray-200" : "bg-gray-300 text-gray-700"
+                  isDark
+                    ? "bg-gray-700 text-gray-200"
+                    : "bg-gray-300 text-gray-700"
                 }`}
               >
                 {auth.user?.username?.[0]?.toUpperCase() || "U"}
@@ -124,7 +169,9 @@ const Sidebar = () => {
               transition={{ duration: 0.2 }}
               className="overflow-hidden whitespace-nowrap"
             >
-              <h2 className="text-sm font-medium truncate">{auth.user?.username || "User"}</h2>
+              <h2 className="text-sm font-medium truncate">
+                {auth.user?.username || "User"}
+              </h2>
               <p className="text-xs capitalize text-gray-500">{userRole}</p>
             </motion.div>
           </div>
@@ -165,7 +212,11 @@ const Sidebar = () => {
         </div>
 
         {/* Logout Button */}
-        <div className={`border-t ${isDark ? "border-gray-800" : "border-gray-300"}`}>
+        <div
+          className={`border-t ${
+            isDark ? "border-gray-800" : "border-gray-300"
+          }`}
+        >
           <motion.button
             onClick={handleLogout}
             whileHover={{ scale: 1.02 }}

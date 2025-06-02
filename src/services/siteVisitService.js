@@ -20,6 +20,16 @@ const siteVisitService = {
     }
   },
 
+  getUpcomingSiteVisits: async () => {
+    try {
+      // CORRECTED: Changed from ".get()" to the existing ".request()" method
+      return await apiServiceInstance.request(`${SITE_VISITS_ENDPOINT}upcoming/`);
+    } catch (error) {
+      console.error("Error fetching upcoming site visits:", error.message);
+      throw error;
+    }
+  },
+
   /**
    * Fetches a single site visit by its ID.
    * @param {number|string} id - The ID of the site visit.

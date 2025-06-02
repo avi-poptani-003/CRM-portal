@@ -22,6 +22,7 @@ import { toast } from "react-toastify";
 import LeadService from "../services/leadService";
 import UserService from "../services/UserService";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -45,6 +46,9 @@ function debounce(func, delay) {
 
 function Leads() {
   const { theme } = useTheme();
+  const auth = useAuth();
+  const { user, isAdmin, isManager, isAgent } = auth;
+
   const { hasPermission } = useUserRole();
   const isDark = theme === "dark";
 
@@ -60,7 +64,7 @@ function Leads() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   const [leads, setLeads] = useState([]);
-  const [users, setUsersState] = useState([]);
+  const [usersStateInternal, setUsersStateInternal] = useState([]); // Correctly declared
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -70,7 +74,7 @@ function Leads() {
   const [pageSize, setPageSize] = useState(10);
   const [totalLeads, setTotalLeads] = useState(0);
 
-  const [refreshTrigger, setRefreshTrigger] = useState(0); // Kept for potential other uses, but reset will also trigger data load
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const leadSources = [
     "Website",
@@ -79,6 +83,7 @@ function Leads() {
     "Referral",
     "Direct Call",
     "Email",
+    "Exhibition",
     "Other",
   ].sort();
   const leadStatuses = [
@@ -93,11 +98,10 @@ function Leads() {
     "Dropped",
   ].sort();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSetSearchQuery = useCallback(
     debounce((query) => {
       setSearchQuery(query);
-      setCurrentPage(1); // Reset page on new search
+      setCurrentPage(1);
     }, 500),
     []
   );
@@ -106,15 +110,32 @@ function Leads() {
     debouncedSetSearchQuery(searchInput);
   }, [searchInput, debouncedSetSearchQuery]);
 
+  const isCurrentUserPureAgent =
+    user && isAgent() && !isManager() && !isAdmin();
+
+  useEffect(() => {
+    if (isCurrentUserPureAgent && user?.id) {
+      if (assigneeFilter !== user.id.toString()) {
+        setAssigneeFilter(user.id.toString());
+      }
+    }
+  }, [user, isCurrentUserPureAgent, assigneeFilter]);
+
   useEffect(() => {
     const loadData = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
-        // Fetch users first or in parallel if not dependent on leads
+        // Fetch users only if not a pure agent, or if needed for other reasons
+        // Pure agents might not need the full list if UI is adapted.
+        // However, AddLeadDialog/LeadDetailsDialog might still expect it.
+        // For now, fetching for all roles that can access this page.
         const usersResponse = await UserService.getUsers();
-        const currentUsers = usersResponse.results || usersResponse || [];
-        setUsersState(currentUsers);
+        setUsersStateInternal(usersResponse.results || usersResponse || []); // Correctly set
 
         const params = {
           page: currentPage,
@@ -122,15 +143,30 @@ function Leads() {
           ...(searchQuery && { search: searchQuery }),
           ...(statusFilter !== "All Statuses" && { status: statusFilter }),
           ...(sourceFilter !== "All Sources" && { source: sourceFilter }),
-          ...(assigneeFilter !== "All Assignees" && {
-            assigned_to: assigneeFilter,
-          }),
         };
+
+        if (isCurrentUserPureAgent) {
+          params.assigned_to = user.id;
+        } else if (isManager() && !isAdmin()) {
+          if (assigneeFilter !== "All Assignees") {
+            params.assigned_to = assigneeFilter;
+          }
+        } else if (isAdmin()) {
+          if (assigneeFilter !== "All Assignees") {
+            params.assigned_to = assigneeFilter;
+          }
+        } else {
+          if (assigneeFilter !== "All Assignees") {
+            params.assigned_to = assigneeFilter;
+          }
+        }
 
         const leadsResponse = await LeadService.getLeads(params);
 
+        const currentUsersForMapping =
+          usersResponse.results || usersResponse || [];
         const transformedLeads = leadsResponse.results.map((lead) => {
-          const assignedUser = currentUsers.find(
+          const assignedUser = currentUsersForMapping.find(
             (u) => u.id === lead.assigned_to
           );
           return {
@@ -185,9 +221,14 @@ function Leads() {
 
     loadData();
   }, [
+    user,
+    isAdmin,
+    isManager,
+    isAgent,
+    isCurrentUserPureAgent,
     currentPage,
     pageSize,
-    refreshTrigger, // Keep if you have other manual refresh needs
+    refreshTrigger,
     searchQuery,
     statusFilter,
     sourceFilter,
@@ -206,7 +247,7 @@ function Leads() {
     try {
       await LeadService.createLead(submissionData);
       setIsAddLeadModalOpen(false);
-      setRefreshTrigger((prev) => prev + 1); // Refresh data after adding
+      setRefreshTrigger((prev) => prev + 1);
       toast.success("Lead created successfully!");
     } catch (err) {
       console.error("Error creating lead:", err);
@@ -240,7 +281,7 @@ function Leads() {
       await LeadService.updateLead(submissionData.id, submissionData);
       setIsDetailsModalOpen(false);
       setSelectedLead(null);
-      setRefreshTrigger((prev) => prev + 1); // Refresh data after updating
+      setRefreshTrigger((prev) => prev + 1);
       toast.success("Lead updated successfully!");
     } catch (err) {
       console.error("Error updating lead:", err);
@@ -263,9 +304,9 @@ function Leads() {
     try {
       await LeadService.deleteLead(leadId);
       if (leads.length === 1 && currentPage > 1) {
-        setCurrentPage(currentPage - 1); // Go to previous page if last item on current page is deleted
+        setCurrentPage(currentPage - 1);
       } else {
-        setRefreshTrigger((prev) => prev + 1); // Refresh data
+        setRefreshTrigger((prev) => prev + 1);
       }
       toast.success("Lead deleted successfully.");
       setIsDetailsModalOpen(false);
@@ -286,7 +327,7 @@ function Leads() {
     try {
       const response = await LeadService.importLeads(formData);
       setIsImportModalOpen(false);
-      setRefreshTrigger((prev) => prev + 1); // Refresh data after import
+      setRefreshTrigger((prev) => prev + 1);
       toast.success(response.message || "Leads imported successfully!");
     } catch (err) {
       console.error("Error importing leads:", err);
@@ -304,10 +345,14 @@ function Leads() {
         ...(searchQuery && { search: searchQuery }),
         ...(statusFilter !== "All Statuses" && { status: statusFilter }),
         ...(sourceFilter !== "All Sources" && { source: sourceFilter }),
-        ...(assigneeFilter !== "All Assignees" && {
-          assigned_to: assigneeFilter,
-        }),
       };
+
+      if (isCurrentUserPureAgent && user?.id) {
+        filters.assigned_to = user.id;
+      } else if (assigneeFilter !== "All Assignees") {
+        filters.assigned_to = assigneeFilter;
+      }
+
       const blob = await LeadService.exportLeads(filters);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -325,16 +370,6 @@ function Leads() {
       console.error("Error exporting leads:", err);
       toast.error(err.response?.data?.detail || "Failed to export leads.");
     }
-  };
-
-  // New function to reset filters
-  const handleResetFilters = () => {
-    setSearchInput(""); // This will trigger debouncedSetSearchQuery, which sets searchQuery
-    setStatusFilter("All Statuses");
-    setSourceFilter("All Sources");
-    setAssigneeFilter("All Assignees");
-    setCurrentPage(1); // Go back to the first page
-    // No need to call setRefreshTrigger here, as changes to filter states will trigger the useEffect for data loading.
   };
 
   const getStatusBadgeClass = (status) => {
@@ -447,6 +482,7 @@ function Leads() {
     setSelectedLead(lead);
     setIsDetailsModalOpen(true);
   };
+
   const formatDateForDisplay = (dateString) => {
     if (!dateString) return "N/A";
     try {
@@ -456,7 +492,7 @@ function Leads() {
         year: "numeric",
       });
     } catch (e) {
-      return dateString; // Fallback if date is invalid
+      return dateString;
     }
   };
 
@@ -466,7 +502,7 @@ function Leads() {
   const tdStyle = `px-2 py-2 sm:px-3 sm:py-3 text-xs sm:text-sm ${
     isDark ? "text-gray-300" : "text-gray-700"
   }`;
-  const buttonStyle = `px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-md text-[10px] sm:text-sm font-medium transition-all duration-150 flex items-center gap-1 sm:gap-1.5 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed`;
+  const buttonStyle = `px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium transition-all duration-150 flex items-center gap-1 sm:gap-1.5 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed`;
   const filterSelectStyle = `w-full px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-md border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
     isDark
       ? "bg-gray-700 border-gray-600 text-gray-100"
@@ -488,14 +524,14 @@ function Leads() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           <div className="min-w-0">
             <h1
-              className={`text-2xl md:text-3xl font-bold ${
+              className={`text-lg sm:text-xl md:text-2xl font-bold ${
                 isDark ? "text-white" : "text-gray-800"
               }`}
             >
               Lead Management
             </h1>
             <p
-              className={`text-gray-500 dark:text-gray-400 ${
+              className={`text-xs sm:text-sm mt-0.5 sm:mt-1 ${
                 isDark ? "text-gray-400" : "text-gray-600"
               }`}
             >
@@ -514,8 +550,7 @@ function Leads() {
                     : "bg-blue-500 hover:bg-blue-600 text-white"
                 }`}
               >
-                <Plus size={16} className="sm:size-5" /> Add Lead{" "}
-                {/* Adjusted icon size */}
+                <Plus size={14} /> Add Lead
               </button>
             )}
             {hasPermission("import_leads") && (
@@ -529,8 +564,7 @@ function Leads() {
                     : "bg-green-500 hover:bg-green-600 text-white"
                 }`}
               >
-                <FileUp size={16} className="sm:size-5" /> Import{" "}
-                {/* Adjusted icon size */}
+                <FileUp size={14} /> Import
               </button>
             )}
             {hasPermission("export_leads") && (
@@ -544,8 +578,7 @@ function Leads() {
                     : "bg-purple-500 hover:bg-purple-600 text-white"
                 }`}
               >
-                <Download size={16} className="sm:size-5" /> Export{" "}
-                {/* Adjusted icon size */}
+                <Download size={14} /> Export
               </button>
             )}
           </div>
@@ -655,42 +688,56 @@ function Leads() {
                   id="assigneeFilter"
                   value={assigneeFilter}
                   onChange={(e) => {
-                    setAssigneeFilter(e.target.value);
-                    setCurrentPage(1);
+                    if (!isCurrentUserPureAgent) {
+                      setAssigneeFilter(e.target.value);
+                      setCurrentPage(1);
+                    }
                   }}
                   className={filterSelectStyle}
-                  disabled={users.length === 0 && !loading} // Disable if no users and not loading
+                  disabled={
+                    usersStateInternal.length === 0 ||
+                    (isCurrentUserPureAgent && !!user)
+                  }
                 >
-                  <option value="All Assignees">All Assignees</option>
-                  {users
-                    .filter(
-                      (user) =>
-                        user &&
-                        user.role &&
-                        (user.role.toLowerCase().includes("manager") ||
-                          user.role.toLowerCase().includes("agent") ||
-                          user.role.toLowerCase().includes("admin"))
-                    )
-                    .map((user) => (
-                      <option key={user.id} value={user.id.toString()}>
-                        {`${user.first_name || "User"} ${
-                          user.last_name || ""
-                        }`.trim() || `User ID: ${user.id}`}
-                      </option>
-                    ))}
+                  {isCurrentUserPureAgent && user ? (
+                    <option value={user.id.toString()}>
+                      {`${user.first_name || "My"} ${
+                        user.last_name || "Leads"
+                      }`.trim()}
+                    </option>
+                  ) : (
+                    <>
+                      <option value="All Assignees">All Assignees</option>
+                      {usersStateInternal
+                        .filter(
+                          (u) =>
+                            u &&
+                            u.role &&
+                            (u.role.toLowerCase().includes("manager") ||
+                              u.role.toLowerCase().includes("agent") ||
+                              u.role.toLowerCase().includes("admin"))
+                        )
+                        .map((u) => (
+                          <option key={u.id} value={u.id.toString()}>
+                            {`${u.first_name || "User"} ${
+                              u.last_name || ""
+                            }`.trim() || `User ID: ${u.id}`}
+                          </option>
+                        ))}
+                    </>
+                  )}
                 </select>
               </div>
-              {/* MODIFIED BUTTON BELOW */}
               <button
                 type="button"
-                onClick={handleResetFilters} // Changed onClick handler
+                onClick={() => setRefreshTrigger((prev) => prev + 1)}
                 disabled={loading}
                 className={`p-2 sm:p-2.5 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 self-end flex-shrink-0 ${
                   isDark
                     ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
                     : "bg-white border-gray-300 text-gray-700 hover:bg-gray-100"
                 }`}
-                title="Reset Filters" // Changed title
+                title="Refresh Leads"
               >
                 <RefreshCw
                   size={16}
@@ -700,22 +747,21 @@ function Leads() {
             </div>
           </div>
         </div>
-        {loading &&
-          leads.length > 0 && ( // Show progress bar only if there are existing leads being filtered/reloaded
-            <div className="absolute bottom-0 left-0 right-0 h-0.5">
+        {loading && leads.length > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 h-0.5">
+            <div
+              className={`h-full w-full ${
+                isDark ? "bg-blue-500/30" : "bg-blue-500/20"
+              } overflow-hidden`}
+            >
               <div
-                className={`h-full w-full ${
-                  isDark ? "bg-blue-500/30" : "bg-blue-500/20"
-                } overflow-hidden`}
-              >
-                <div
-                  className={`h-full ${
-                    isDark ? "bg-blue-500" : "bg-blue-500"
-                  } animate-indeterminate-progress`}
-                ></div>
-              </div>
+                className={`h-full ${
+                  isDark ? "bg-blue-500" : "bg-blue-500"
+                } animate-indeterminate-progress`}
+              ></div>
             </div>
-          )}
+          </div>
+        )}
       </div>
 
       <div
@@ -723,12 +769,11 @@ function Leads() {
           isDark ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
         }`}
       >
-        {loading && leads.length === 0 && <LoadingSpinner size="lg" />}{" "}
-        {/* Show spinner if loading and no leads yet */}
+        {loading && leads.length === 0 && <LoadingSpinner size="lg" />}
         {error && !loading && (
           <ErrorMessage
             error={error}
-            onRetry={handleResetFilters} // Allow retry to also reset filters
+            onRetry={() => setRefreshTrigger((prev) => prev + 1)}
           />
         )}
         {!loading && leads.length === 0 && !error && (
@@ -753,6 +798,7 @@ function Leads() {
             )}
           </div>
         )}
+
         {leads.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px] sm:min-w-[768px] md:min-w-[900px]">
@@ -841,8 +887,7 @@ function Leads() {
                             alt={lead.assignedTo}
                             className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover"
                             onError={(e) => {
-                              e.target.style.display = "none"; // Hide if image fails to load
-                              // Optionally, show a placeholder avatar here
+                              e.target.style.display = "none";
                             }}
                           />
                         ) : (
@@ -877,15 +922,14 @@ function Leads() {
                           }`}
                           title="View/Edit Lead"
                         >
-                          <Edit size={14} /> {/* Adjusted icon size */}
+                          <Edit size={12} />
                         </button>
                         {hasPermission("delete_leads") && (
                           <button
                             type="button"
                             onClick={() => {
-                              // Keep original delete confirmation flow
                               setSelectedLead(lead);
-                              setIsDetailsModalOpen(true); // Open details, can delete from there
+                              setIsDetailsModalOpen(true); // Delete confirmation can be inside details modal
                             }}
                             className={`p-0.5 sm:p-1 rounded-md ${
                               isDark
@@ -894,7 +938,7 @@ function Leads() {
                             }`}
                             title="Delete Lead"
                           >
-                            <Trash2 size={14} /> {/* Adjusted icon size */}
+                            <Trash2 size={12} />
                           </button>
                         )}
                       </div>
@@ -905,6 +949,7 @@ function Leads() {
             </table>
           </div>
         )}
+
         {totalLeads > 0 && !error && leads.length > 0 && (
           <div
             className={`px-2 sm:px-4 py-2 sm:py-3 border-t ${
@@ -1001,12 +1046,13 @@ function Leads() {
         )}
       </div>
 
+      {/* Ensure usersStateInternal is passed as 'users' prop */}
       {isAddLeadModalOpen && (
         <AddLeadDialog
           isOpen={isAddLeadModalOpen}
           onClose={() => setIsAddLeadModalOpen(false)}
           onSubmit={handleAddLead}
-          users={users}
+          users={usersStateInternal} /* Corrected: Pass usersStateInternal */
         />
       )}
       {isImportModalOpen && (
@@ -1026,7 +1072,7 @@ function Leads() {
           lead={selectedLead}
           onUpdate={handleUpdateLead}
           onDelete={handleDeleteLead}
-          users={users}
+          users={usersStateInternal} /* Corrected: Pass usersStateInternal */
           canEdit={hasPermission("edit_leads")}
           canDelete={hasPermission("delete_leads")}
         />
