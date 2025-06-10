@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useTheme } from "../context/ThemeContext"
 import {
   PieChart,
@@ -33,8 +33,9 @@ import {
   ChevronRight,
 } from "lucide-react"
 import Navbar from "../components/common/Navbar"
+import propertyService from "../services/propertyService"
+import leadService from "../services/leadService"
 
-// Format number to Indian currency
 const formatIndianPrice = (value) => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -42,81 +43,6 @@ const formatIndianPrice = (value) => {
     maximumFractionDigits: 0,
   }).format(value)
 }
-
-// Mock Data
-const salesData = [
-  { month: "Jan", revenue: 3750000, deals: 12 },
-  { month: "Feb", revenue: 4300000, deals: 15 },
-  { month: "Mar", revenue: 3950000, deals: 14 },
-  { month: "Apr", revenue: 5100000, deals: 18 },
-  { month: "May", revenue: 4600000, deals: 16 },
-]
-
-const performanceData = [
-  { agent: "John Doe", deals: 24, revenue: 72500000, avatar: "/placeholder.svg?height=40&width=40" },
-  { agent: "Jane Smith", deals: 22, revenue: 65000000, avatar: "/placeholder.svg?height=40&width=40" },
-  { agent: "Mike Johnson", deals: 18, revenue: 51500000, avatar: "/placeholder.svg?height=40&width=40" },
-  { agent: "Sarah Wilson", deals: 16, revenue: 48500000, avatar: "/placeholder.svg?height=40&width=40" },
-  { agent: "Tom Brown", deals: 15, revenue: 45000000, avatar: "/placeholder.svg?height=40&width=40" },
-]
-
-// Property type data
-const propertyTypeData = [
-  { name: "Residential", value: 65 },
-  { name: "Commercial", value: 20 },
-  { name: "Land", value: 15 },
-]
-
-// Lead source data
-const leadSourceData = [
-  { name: "Website", value: 45 },
-  { name: "Referrals", value: 25 },
-  { name: "Social Media", value: 20 },
-  { name: "Other", value: 10 },
-]
-
-// Monthly growth data
-const monthlyGrowthData = [
-  { name: "Jan", growth: 5.2 },
-  { name: "Feb", growth: 7.8 },
-  { name: "Mar", growth: 3.5 },
-  { name: "Apr", growth: 9.2 },
-  { name: "May", growth: 6.4 },
-]
-
-// Recent properties data
-const recentProperties = [
-  {
-    id: 1,
-    name: "Sunset Villa",
-    type: "Residential",
-    location: "Palm Beach Road, Sector 12",
-    price: 12500000,
-    status: "Available",
-    views: 245,
-    inquiries: 18,
-  },
-  {
-    id: 2,
-    name: "Ocean View Apartment",
-    type: "Residential",
-    location: "Marine Drive, Block B",
-    price: 8750000,
-    status: "Available",
-    views: 187,
-    inquiries: 12,
-  },
-  {
-    id: 3,
-    name: "Green Valley Commercial Space",
-    type: "Commercial",
-    location: "Business District, Tower 3",
-    price: 18900000,
-    status: "Under Contract",
-    views: 156,
-    inquiries: 9,
-  },
-]
 
 const COLORS = ["#4285F4", "#34A853", "#FBBC05", "#EA4335", "#8AB4F8", "#CEEAD6", "#FDE293", "#F6AEA9"]
 
@@ -129,6 +55,181 @@ function Analytics() {
   const [selectedPropertyType, setSelectedPropertyType] = useState("All Types")
   const [selectedPriceRange, setSelectedPriceRange] = useState("All Prices")
 
+  // State for all fetched data
+  const [kpiCards, setKpiCards] = useState([])
+  const [salesData, setSalesData] = useState([])
+  const [monthlyGrowthData, setMonthlyGrowthData] = useState([])
+  const [propertyTypeData, setPropertyTypeData] = useState([])
+  const [leadSourceData, setLeadSourceData] = useState([])
+  const [recentProperties, setRecentProperties] = useState([])
+  
+  // --- ADD STATE FOR TEAM PERFORMANCE ---
+  const [teamPerformanceData, setTeamPerformanceData] = useState([])
+
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      try {
+        setIsLoading(true)
+        // Fetch all data in parallel
+        const [properties, leadStats, teamPerformance] = await Promise.all([
+          propertyService.getProperties(),
+          leadService.getDashboardStats("year"),
+          leadService.getTeamPerformance(), // <-- Fetch team performance data
+        ])
+        
+        setTeamPerformanceData(teamPerformance) // <-- Set the state
+
+        // --- (The rest of your existing data processing for properties and lead stats remains the same) ---
+        // --- Process Property Data ---
+        const typeCounts = properties.reduce((acc, property) => {
+          const type = property.property_type || "Other"
+          acc[type] = (acc[type] || 0) + 1
+          return acc
+        }, {})
+        const totalProperties = properties.length
+        const distributionData = Object.entries(typeCounts).map(([name, count]) => ({
+          name,
+          value: Math.round((count / totalProperties) * 100),
+        }))
+        setPropertyTypeData(distributionData)
+
+        const sortedProperties = [...properties].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        setRecentProperties(sortedProperties.slice(0, 3))
+
+        // --- Process Lead Statistics ---
+        const {
+          total_leads,
+          converted_leads,
+          conversion_rate,
+          new_leads,
+          current_month_total_leads,
+          previous_month_total_leads,
+          current_month_converted_leads,
+          previous_month_converted_leads,
+          source_distribution,
+          daily_leads_added,
+        } = leadStats
+
+        // 1. KPI Cards
+        let totalLeadsChange = 0
+        if (previous_month_total_leads > 0) {
+          totalLeadsChange = ((current_month_total_leads - previous_month_total_leads) / previous_month_total_leads) * 100
+        } else if (current_month_total_leads > 0) {
+          totalLeadsChange = 100
+        }
+
+        let convertedLeadsChange = 0
+        if (previous_month_converted_leads > 0) {
+          convertedLeadsChange =
+            ((current_month_converted_leads - previous_month_converted_leads) / previous_month_converted_leads) * 100
+        } else if (current_month_converted_leads > 0) {
+          convertedLeadsChange = 100
+        }
+
+        setKpiCards([
+          {
+            title: "Total Leads",
+            value: total_leads,
+            change: `${totalLeadsChange.toFixed(1)}%`,
+            icon: Users,
+            trend: totalLeadsChange >= 0 ? "up" : "down",
+            color: "text-blue-600 dark:text-blue-400",
+            bgColor: "bg-blue-100 dark:bg-blue-900/30",
+          },
+          {
+            title: "Converted Deals",
+            value: converted_leads,
+            change: `${convertedLeadsChange.toFixed(1)}%`,
+            icon: Home,
+            trend: convertedLeadsChange >= 0 ? "up" : "down",
+            color: "text-green-600 dark:text-green-400",
+            bgColor: "bg-green-100 dark:bg-green-900/30",
+          },
+          {
+            title: "New Leads (This Month)",
+            value: new_leads,
+            change: "", // No comparison data from API for this metric
+            icon: CalendarCheck,
+            trend: "up",
+            color: "text-orange-600 dark:text-orange-400",
+            bgColor: "bg-orange-100 dark:bg-orange-900/30",
+          },
+          {
+            title: "Conversion Rate",
+            value: `${conversion_rate}%`,
+            change: "", // No comparison data from API for this metric
+            icon: Percent,
+            trend: "up",
+            color: "text-purple-600 dark:text-purple-400",
+            bgColor: "bg-purple-100 dark:bg-purple-900/30",
+          },
+        ])
+
+        // 2. Lead Source Distribution
+        const totalLeadsFromSource = source_distribution.reduce((acc, item) => acc + item.count, 0)
+        const formattedLeadSourceData = source_distribution.map((item) => ({
+          name: item.source,
+          value: totalLeadsFromSource > 0 ? Math.round((item.count / totalLeadsFromSource) * 100) : 0,
+        }))
+        setLeadSourceData(formattedLeadSourceData)
+
+        // 3. Leads Over Time (Sales) & Monthly Growth Charts
+        const monthlyData = daily_leads_added.reduce((acc, item) => {
+          const month = item.date.substring(0, 7) // e.g., 2023-MM
+          if (!acc[month]) {
+            acc[month] = { count: 0 }
+          }
+          acc[month].count += item.count
+          return acc
+        }, {})
+
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        const formattedSalesData = Object.keys(monthlyData).map((monthKey) => {
+          const date = new Date(`${monthKey}-02`)
+          return {
+            month: monthNames[date.getMonth()],
+            leads: monthlyData[monthKey].count,
+          }
+        })
+        setSalesData(formattedSalesData)
+
+        const sortedMonths = Object.keys(monthlyData).sort()
+        const formattedGrowthData = []
+        for (let i = 0; i < sortedMonths.length; i++) {
+          const currentMonthKey = sortedMonths[i]
+          const prevMonthKey = i > 0 ? sortedMonths[i - 1] : null
+          const currentMonthCount = monthlyData[currentMonthKey].count
+          const prevMonthCount = prevMonthKey ? monthlyData[prevMonthKey].count : 0
+          let growth = 0
+          if (prevMonthCount > 0) {
+            growth = ((currentMonthCount - prevMonthCount) / prevMonthCount) * 100
+          } else if (currentMonthCount > 0) {
+            growth = 100
+          }
+          const date = new Date(`${currentMonthKey}-02`)
+          formattedGrowthData.push({
+            name: monthNames[date.getMonth()],
+            growth: parseFloat(growth.toFixed(1)),
+          })
+        }
+        setMonthlyGrowthData(formattedGrowthData.slice(-5)) // Get last 5 months of data
+
+
+        setError(null)
+      } catch (err) {
+        console.error("Failed to fetch analytics data:", err)
+        setError("Failed to load analytics data. Please try again later.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchAnalyticsData()
+  }, [])
+  
   const handleReset = () => {
     setFilter("")
   }
@@ -136,51 +237,28 @@ function Analytics() {
   const isDark = theme === "dark"
   const secondaryText = isDark ? "text-gray-400" : "text-gray-500"
 
-  const kpiCards = [
-    {
-      title: "Total Revenue",
-      value: formatIndianPrice(21700000),
-      change: "+12.5%",
-      icon: IndianRupee,
-      trend: "up",
-      color: "text-blue-600 dark:text-blue-400",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30",
-    },
-    {
-      title: "Properties Sold",
-      value: "75",
-      change: "+8.2%",
-      icon: Home,
-      trend: "up",
-      color: "text-green-600 dark:text-green-400",
-      bgColor: "bg-green-100 dark:bg-green-900/30",
-    },
-    {
-      title: "Site Visits",
-      value: "183",
-      change: "+15.3%",
-      icon: CalendarCheck,
-      trend: "up",
-      color: "text-orange-600 dark:text-orange-400",
-      bgColor: "bg-orange-100 dark:bg-orange-900/30",
-    },
-    {
-      title: "Conversion Rate",
-      value: "20.8%",
-      change: "+2.4%",
-      icon: Percent,
-      trend: "up",
-      color: "text-purple-600 dark:text-purple-400",
-      bgColor: "bg-purple-100 dark:bg-purple-900/30",
-    },
-  ]
+  if (isLoading) {
+    return (
+      <div className={`min-h-screen ${isDark ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"} flex justify-center items-center`}>
+        <p>Loading analytics dashboard...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className={`min-h-screen ${isDark ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"} flex justify-center items-center`}>
+        <p className="text-red-500">{error}</p>
+      </div>
+    )
+  }
 
   return (
     <div className={`min-h-screen ${isDark ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
       <Navbar />
       <div className="container mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+         {/* Header */}
+         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">Analytics Dashboard</h1>
             <p className={secondaryText}>Comprehensive insights for your real estate business</p>
@@ -313,7 +391,7 @@ function Analytics() {
           <>
             {/* Bento Grid Layout */}
             <div className="grid grid-cols-1 md:grid-cols-6 lg:grid-cols-12 gap-6 mb-6">
-              {/* KPI Cards - Each takes 3 columns on large screens, 3 on medium */}
+              {/* KPI Cards */}
               {kpiCards.map((card) => (
                 <div
                   key={card.title}
@@ -325,12 +403,14 @@ function Analytics() {
                       <h3 className="text-2xl font-bold mt-1 group-hover:text-blue-500 transition-colors duration-300">
                         {card.value}
                       </h3>
-                      <div
-                        className={`flex items-center mt-1 ${card.trend === "up" ? "text-green-500" : "text-red-500"}`}
-                      >
-                        <ArrowUpRight className={`h-3 w-3 mr-1 ${card.trend === "down" ? "rotate-90" : ""}`} />
-                        <span className="text-xs font-medium">{card.change}</span>
-                      </div>
+                      {card.change && (
+                        <div
+                          className={`flex items-center mt-1 ${card.trend === "up" ? "text-green-500" : "text-red-500"}`}
+                        >
+                          <ArrowUpRight className={`h-3 w-3 mr-1 ${card.trend === "down" ? "rotate-90" : ""}`} />
+                          <span className="text-xs font-medium">{card.change}</span>
+                        </div>
+                      )}
                     </div>
                     <div
                       className={`${card.bgColor} p-3 rounded-full transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-100 group-hover:text-blue-600 ${isDark ? "group-hover:bg-blue-900/50" : ""}`}
@@ -343,13 +423,13 @@ function Analytics() {
                 </div>
               ))}
 
-              {/* Revenue & Deals Chart - Takes 8 columns on large screens, 4 on medium */}
+              {/* Leads Over Time Chart */}
               <div
                 className={`${isDark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-gray-300 text-gray-900"} rounded-xl shadow-sm p-6 border md:col-span-4 lg:col-span-8 transition-all duration-300 hover:shadow-md hover:border-blue-500 group`}
               >
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold group-hover:text-blue-500 transition-colors duration-300">
-                    Revenue & Deals
+                    Leads Over Time
                   </h3>
                   <div className="flex space-x-2">
                     {["week", "month", "quarter", "year"].map((range) => (
@@ -373,23 +453,14 @@ function Analytics() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={salesData}>
                       <defs>
-                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#4285F4" stopOpacity={0.8} />
                           <stop offset="95%" stopColor="#4285F4" stopOpacity={0.1} />
-                        </linearGradient>
-                        <linearGradient id="colorDeals" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#34A853" stopOpacity={0.8} />
-                          <stop offset="95%" stopColor="#34A853" stopOpacity={0.1} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#f3f4f6"} vertical={false} />
                       <XAxis dataKey="month" stroke={isDark ? "#9CA3AF" : "#6B7280"} />
-                      <YAxis
-                        yAxisId="left"
-                        stroke={isDark ? "#9CA3AF" : "#6B7280"}
-                        tickFormatter={(value) => `₹${(value / 100000).toFixed(1)}L`}
-                      />
-                      <YAxis yAxisId="right" orientation="right" stroke={isDark ? "#9CA3AF" : "#6B7280"} />
+                      <YAxis stroke={isDark ? "#9CA3AF" : "#6B7280"} />
                       <RechartsTooltip
                         contentStyle={{
                           backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
@@ -397,33 +468,22 @@ function Analytics() {
                           borderRadius: "8px",
                           boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                         }}
-                        formatter={(value, name) => [name === "Revenue" ? formatIndianPrice(value) : value, name]}
                       />
                       <RechartsLegend />
                       <Area
-                        yAxisId="left"
                         type="monotone"
-                        dataKey="revenue"
+                        dataKey="leads"
                         stroke="#4285F4"
                         fillOpacity={1}
-                        fill="url(#colorRevenue)"
-                        name="Revenue"
-                      />
-                      <Area
-                        yAxisId="right"
-                        type="monotone"
-                        dataKey="deals"
-                        stroke="#34A853"
-                        fillOpacity={1}
-                        fill="url(#colorDeals)"
-                        name="Deals"
+                        fill="url(#colorLeads)"
+                        name="Leads Added"
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              {/* Monthly Growth - Takes 4 columns on large screens, 2 on medium */}
+              {/* Monthly Growth */}
               <div
                 className={`${isDark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-gray-300 text-gray-900"} rounded-xl shadow-sm p-6 border md:col-span-2 lg:col-span-4 transition-all duration-300 hover:shadow-md hover:border-blue-500 group`}
               >
@@ -461,7 +521,7 @@ function Analytics() {
                 </div>
               </div>
 
-              {/* Property Distribution - Takes 5 columns on large screens, 3 on medium */}
+              {/* Property Distribution */}
               <div
                 className={`${isDark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-gray-300 text-gray-900"} rounded-xl shadow-sm p-6 border md:col-span-3 lg:col-span-5 transition-all duration-300 hover:shadow-md hover:border-blue-500 group`}
               >
@@ -520,25 +580,27 @@ function Analytics() {
                 </div>
               </div>
 
-              {/* Top Performers - Takes 7 columns on large screens, 3 on medium */}
+              {/* Top Performers */}
               <div
                 className={`${isDark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-gray-300 text-gray-900"} rounded-xl shadow-sm p-6 border md:col-span-3 lg:col-span-7 transition-all duration-300 hover:shadow-md hover:border-blue-500 group`}
               >
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold group-hover:text-blue-500 transition-colors duration-300">
-                    Top Performers
-                  </h3>
+                  <div>
+                    <h3 className="text-lg font-bold group-hover:text-blue-500 transition-colors duration-300">
+                      Top Performers
+                    </h3>
+                  </div>
                   <button className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-all duration-200 hover:translate-x-1 hover:bg-blue-50 hover:bg-opacity-20 p-1 rounded flex items-center">
                     View All <ChevronRight className="h-4 w-4 ml-1" />
                   </button>
                 </div>
                 <div className="space-y-4">
-                  {performanceData.slice(0, 3).map((agent, index) => (
+                  {teamPerformanceData.slice(0, 3).map((agent, index) => (
                     <div key={agent.agent} className="flex items-center justify-between py-2">
                       <div className="flex items-center space-x-3">
                         <div className="relative">
                           <img
-                            src={agent.avatar || "/placeholder.svg"}
+                            src={agent.avatar || "/image.png"}
                             alt={agent.agent}
                             className="w-10 h-10 rounded-full object-cover"
                           />
@@ -560,7 +622,7 @@ function Analytics() {
                         <div className={`w-24 h-1.5 ${isDark ? "bg-gray-600" : "bg-gray-200"} rounded-full mt-1`}>
                           <div
                             className="h-full bg-blue-600 rounded-full"
-                            style={{ width: `${(agent.deals / 24) * 100}%` }}
+                            style={{ width: `${agent.conversionRate}%` }}
                           ></div>
                         </div>
                       </div>
@@ -569,7 +631,7 @@ function Analytics() {
                 </div>
               </div>
 
-              {/* Lead Sources - Takes 4 columns on large screens, 2 on medium */}
+              {/* Lead Sources */}
               <div
                 className={`${isDark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-gray-300 text-gray-900"} rounded-xl shadow-sm p-6 border md:col-span-2 lg:col-span-4 transition-all duration-300 hover:shadow-md hover:border-blue-500 group`}
               >
@@ -579,7 +641,7 @@ function Analytics() {
                   </h3>
                   <div className="flex items-center text-gray-500 dark:text-gray-400">
                     <Users className="h-4 w-4 mr-1" />
-                    <span className="text-xs">Distribution</span>
+                    <span className="text-xs">Distribution (%)</span>
                   </div>
                 </div>
                 <div className="h-64">
@@ -606,7 +668,7 @@ function Analytics() {
                 </div>
               </div>
 
-              {/* Recent Properties - Takes 8 columns on large screens, 4 on medium */}
+              {/* Recent Properties */}
               <div
                 className={`${isDark ? "bg-gray-700 border-gray-600 text-gray-100" : "bg-white border-gray-300 text-gray-900"} rounded-xl shadow-sm p-6 border md:col-span-4 lg:col-span-8 transition-all duration-300 hover:shadow-md hover:border-blue-500 group`}
               >
@@ -644,14 +706,14 @@ function Analytics() {
                         >
                           <td className="px-6 py-4">
                             <div className="font-medium group-hover:text-blue-500 transition-colors duration-200">
-                              {property.name}
+                              {property.title}
                             </div>
                             <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-1">
                               <Building className="w-3 h-3 mr-1" />
-                              <span>{property.type}</span>
+                              <span>{property.property_type}</span>
                               <span className="mx-1">•</span>
                               <MapPin className="w-3 h-3 mr-1" />
-                              <span className="truncate max-w-[150px]">{property.location}</span>
+                              <span className="truncate max-w-[150px]">{property.address}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -672,11 +734,11 @@ function Analytics() {
                             <div className="flex items-center gap-4">
                               <div className="flex items-center gap-1">
                                 <Users className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                <span className="text-sm">{property.views}</span>
+                                <span className="text-sm">{property.views || 0}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                <span className="text-sm">{property.inquiries}</span>
+                                <span className="text-sm">{property.inquiries || 0}</span>
                               </div>
                             </div>
                           </td>
@@ -719,7 +781,7 @@ function Analytics() {
                     </tr>
                   </thead>
                   <tbody className={`divide-y ${isDark ? "divide-gray-600" : "divide-gray-300"}`}>
-                    {performanceData.map((agent, index) => (
+                    {teamPerformanceData.map((agent, index) => (
                       <tr
                         key={agent.agent}
                         className={`${isDark ? "hover:bg-blue-900/10" : "hover:bg-blue-50"} cursor-pointer transition-all duration-200 group border-l-4 border-transparent hover:border-blue-500`}
@@ -727,7 +789,7 @@ function Analytics() {
                         <td className="px-6 py-4">
                           <div className="flex items-center">
                             <img
-                              src={agent.avatar || "/placeholder.svg"}
+                              src={agent.avatar || "/image.png"}
                               alt={agent.agent}
                               className="w-10 h-10 rounded-full mr-3 object-cover transition-transform duration-300 group-hover:scale-110"
                             />
@@ -736,32 +798,25 @@ function Analytics() {
                                 {agent.agent}
                               </div>
                               <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {index < 2 ? "Senior Agent" : "Agent"}
+                                Agent
                               </div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-medium">{agent.deals}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {index === 0
-                              ? "+3 from last month"
-                              : index === 1
-                                ? "+1 from last month"
-                                : "Same as last month"}
-                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-medium">{formatIndianPrice(agent.revenue)}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="font-medium">{Math.round(20 + Math.random() * 15)}%</div>
+                          <div className="font-medium">{agent.conversionRate}%</div>
                         </td>
                         <td className="px-6 py-4">
                           <div className={`w-full h-1.5 ${isDark ? "bg-gray-600" : "bg-gray-200"} rounded-full`}>
                             <div
                               className="h-full bg-blue-600 rounded-full transition-all duration-1000 ease-out group-hover:h-2.5 group-hover:shadow-md group-hover:shadow-blue-500/30"
-                              style={{ width: `${(agent.deals / 24) * 100}%` }}
+                              style={{ width: `${agent.conversionRate}%` }}
                             ></div>
                           </div>
                         </td>
@@ -846,4 +901,4 @@ function Analytics() {
   )
 }
 
-export default Analytics 
+export default Analytics

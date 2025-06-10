@@ -3,8 +3,8 @@ import authService from "./authService";
 const api = authService.getApiInstance();
 
 const LeadService = {
-  // Get leads with pagination and filters
-  getLeads: async (params = {}) => {
+  // ... getLeads, getLead, etc.
+    getLeads: async (params = {}) => {
     try {
       console.log("getLeads params:", params)
 
@@ -198,21 +198,28 @@ const LeadService = {
       throw error
     }
   },
-
-  // Get dashboard statistics - NEW METHOD for dashboard
-  getDashboardStats: async () => {
+  getRevenueOverview: async (params = {}) => {
     try {
-      const response = await api.get("/leads/dashboard_stats/")
-      return response.data
+      const response = await api.get("/leads/revenue_overview/", { params });
+      return response.data;
     } catch (error) {
-      console.error("Error fetching dashboard stats:", error)
-      throw error
+      console.error("Error fetching revenue overview:", error);
+      throw error;
     }
   },
 
-  getDashboardStats: async (timeRange = 'week') => { // Default to 'week'
+  getTeamPerformance: async () => {
     try {
-      // Pass the time_range as a query parameter
+      const response = await api.get("/leads/team_performance/");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching team performance data:", error);
+      throw error;
+    }
+  },
+
+  getDashboardStats: async (timeRange = 'week') => {
+    try {
       const response = await api.get("/leads/dashboard_stats/", {
         params: { time_range: timeRange }
       });
@@ -223,8 +230,7 @@ const LeadService = {
     }
   },
 
-  // Expose the API instance for other services
   getApiInstance: () => api,
-}
+};
 
-export default LeadService
+export default LeadService;

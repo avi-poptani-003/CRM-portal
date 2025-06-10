@@ -31,6 +31,20 @@ const siteVisitService = {
   },
 
   /**
+   * NEW FUNCTION: Fetches the summary counts for the reminders widget.
+   */
+  getSummaryCounts: async () => {
+    try {
+      // This endpoint name must match the @action in your views.py
+      return await apiServiceInstance.request(`${SITE_VISITS_ENDPOINT}summary_counts/`);
+    } catch (error)
+    {
+      console.error("Error fetching summary counts:", error.message);
+      throw error;
+    }
+  },
+
+  /**
    * Fetches a single site visit by its ID.
    * @param {number|string} id - The ID of the site visit.
    */

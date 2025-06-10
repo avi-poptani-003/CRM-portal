@@ -4,6 +4,7 @@ import siteVisitService from "../services/siteVisitService";
 import UserService from "../services/UserService";
 import { useTheme } from "../context/ThemeContext";
 import { useLeadStats } from "../hooks/useLeadStats";
+import leadService from "../services/leadService";
 import {
   BarChart,
   Bar,
@@ -28,7 +29,6 @@ import {
   CheckCircle,
   ArrowUpRight,
   ChevronRight,
-  BarChart2,
   PieChartIcon,
   Download,
   RefreshCw,
@@ -61,15 +61,6 @@ const formatVisitDate = (dateString) => {
     day: "numeric",
   });
 };
-
-const revenueData = [
-  { name: "Jan", revenue: 4000000, sales: 2400000 },
-  { name: "Feb", revenue: 3000000, sales: 1398000 },
-  { name: "Mar", revenue: 9800000, sales: 3908000 },
-  { name: "Apr", revenue: 3908000, sales: 4800000 },
-  { name: "May", revenue: 6800000, sales: 2900000 },
-  { name: "Jun", revenue: 4500000, sales: 2500000 },
-];
 
 const builderPerformanceData = [
   {
@@ -341,7 +332,39 @@ const ExportOptionsModal = ({
   );
 };
 
-// OFFLINE_THRESHOLD_MS is no longer needed as we removed the online/offline logic.
+// New component for the filter buttons
+const TimeRangeFilter = ({ selected, onSelect, isDark }) => {
+  const ranges = [
+    { key: "this_month", label: "This Month" },
+    { key: "3_months", label: "3M" },
+    { key: "6_months", label: "6M" },
+    { key: "year", label: "1Y" },
+  ];
+
+  return (
+    <div className={`flex items-center gap-1 p-1 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}>
+      {ranges.map(range => {
+        const isActive = selected === range.key;
+        return (
+          <button
+            key={range.key}
+            onClick={() => onSelect(range.key)}
+            className={`px-3 py-1 text-xs font-bold rounded-md transition-colors duration-200 ${
+              isActive
+                ? "bg-blue-600 text-white shadow"
+                : isDark
+                ? "text-gray-400 hover:bg-gray-700"
+                : "text-gray-600 hover:bg-gray-300"
+            }`}
+          >
+            {range.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
 
 const Dashboard = () => {
   const { theme } = useTheme();
@@ -351,6 +374,11 @@ const Dashboard = () => {
   const [properties, setProperties] = useState([]);
   const [propertyLoading, setPropertyLoading] = useState(true);
   const [propertyError, setPropertyError] = useState(null);
+
+  const [revenueData, setRevenueData] = useState([]);
+  const [revenueLoading, setRevenueLoading] = useState(true);
+  const [revenueError, setRevenueError] = useState(null);
+  const [revenueTimeRange, setRevenueTimeRange] = useState("year"); // State for revenue chart filter
 
   const [upcomingVisits, setUpcomingVisits] = useState([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
@@ -371,6 +399,20 @@ const Dashboard = () => {
     error: leadStatsError,
     refetch: refetchLeadStats,
   } = useLeadStats(timeRange);
+
+  const fetchRevenueData = useCallback(async (timeRange) => {
+    try {
+      setRevenueLoading(true);
+      const data = await leadService.getRevenueOverview({ time_range: timeRange });
+      setRevenueData(data);
+      setRevenueError(null);
+    } catch (err) {
+      setRevenueError("Failed to load revenue data.");
+      console.error(err);
+    } finally {
+      setRevenueLoading(false);
+    }
+  }, []);
 
   const fetchPropertiesData = useCallback(async () => {
     try {
@@ -410,7 +452,6 @@ const Dashboard = () => {
     try {
       setTeamLoading(true);
       const users = await UserService.getUsers();
-      // Filter for users with role 'manager' or 'agent'
       const teamStatusUsers = users.filter(
         (user) => user.role === "manager" || user.role === "agent"
       );
@@ -430,6 +471,12 @@ const Dashboard = () => {
     fetchUpcomingVisits();
     fetchTeamUsers();
   }, [fetchPropertiesData, fetchUpcomingVisits, fetchTeamUsers]);
+
+  // Refetch revenue data when the time range changes
+  useEffect(() => {
+    fetchRevenueData(revenueTimeRange);
+  }, [revenueTimeRange, fetchRevenueData]);
+
 
   useEffect(() => {
     refetchLeadStats(timeRange);
@@ -498,12 +545,15 @@ const Dashboard = () => {
     fetchPropertiesData();
     fetchUpcomingVisits();
     fetchTeamUsers();
+    fetchRevenueData(revenueTimeRange); // Also refresh revenue data
   }, [
     refetchLeadStats,
     timeRange,
+    revenueTimeRange,
     fetchPropertiesData,
     fetchUpcomingVisits,
     fetchTeamUsers,
+    fetchRevenueData
   ]);
 
   const chartConfig = useMemo(
@@ -591,7 +641,8 @@ const Dashboard = () => {
     >
       <Navbar />
       <div className="container mx-auto px-4 py-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        {/* RESPONSIVE CHANGE: Added items-center for better alignment on mobile */ }
+        <div className="flex flex-col md:flex-row justify-between items-center md:items-center mb-6 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">
               Welcome back, Admin
@@ -669,83 +720,98 @@ const Dashboard = () => {
           />
         </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-6 mb-6">
+          {/* RESPONSIVE CHANGE: Changed md:col-span-2 to lg:col-span-3 to stack on tablets */}
           <ChartContainer
-            className="md:col-span-2 lg:col-span-3"
+            className="lg:col-span-3"
             title="Revenue Overview"
             isDark={isDark}
+            action={
+              <TimeRangeFilter
+                selected={revenueTimeRange}
+                onSelect={setRevenueTimeRange}
+                isDark={isDark}
+              />
+            }
           >
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueData}>
-                  <defs>
-                    <linearGradient
-                      id="colorRevenue"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop offset="5%" stopColor="#4285F4" stopOpacity={0.8} />
-                      <stop
-                        offset="95%"
-                        stopColor="#4285F4"
-                        stopOpacity={0.1}
-                      />
-                    </linearGradient>
-                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#34A853" stopOpacity={0.8} />
-                      <stop
-                        offset="95%"
-                        stopColor="#34A853"
-                        stopOpacity={0.1}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke={chartConfig.gridStroke}
-                    vertical={false}
-                  />
-                  <XAxis dataKey="name" stroke={chartConfig.axisStroke} />
-                  <YAxis
-                    stroke={chartConfig.axisStroke}
-                    tickFormatter={formatCurrency}
-                  />
-                  <RechartsTooltip
-                    contentStyle={chartConfig.contentStyle}
-                    formatter={(value) => [formatCurrency(value), ""]}
-                  />
-                  <RechartsLegend />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#4285F4"
-                    fillOpacity={1}
-                    fill="url(#colorRevenue)"
-                    name="Revenue"
-                    isAnimationActive={true}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="sales"
-                    stroke="#34A853"
-                    fillOpacity={1}
-                    fill="url(#colorSales)"
-                    name="Sales"
-                    isAnimationActive={true}
-                    animationDuration={800}
-                    animationEasing="ease-out"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            {revenueLoading ? (
+              <LoadingSpinner isDark={isDark} />
+            ) : revenueError ? (
+              <ErrorMessage error={revenueError} onRetry={() => fetchRevenueData(revenueTimeRange)} isDark={isDark} />
+            ) : (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={revenueData}>
+                    <defs>
+                      <linearGradient
+                        id="colorRevenue"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop offset="5%" stopColor="#4285F4" stopOpacity={0.8} />
+                        <stop
+                          offset="95%"
+                          stopColor="#4285F4"
+                          stopOpacity={0.1}
+                        />
+                      </linearGradient>
+                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#34A853" stopOpacity={0.8} />
+                        <stop
+                          offset="95%"
+                          stopColor="#34A853"
+                          stopOpacity={0.1}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke={chartConfig.gridStroke}
+                      vertical={false}
+                    />
+                    <XAxis dataKey="name" stroke={chartConfig.axisStroke} />
+                    <YAxis
+                      stroke={chartConfig.axisStroke}
+                      tickFormatter={formatCurrency}
+                    />
+                    <RechartsTooltip
+                      contentStyle={chartConfig.contentStyle}
+                      formatter={(value) => [formatCurrency(value), ""]}
+                    />
+                    <RechartsLegend />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#4285F4"
+                      fillOpacity={1}
+                      fill="url(#colorRevenue)"
+                      name="Revenue"
+                      isAnimationActive={true}
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="sales"
+                      stroke="#34A853"
+                      fillOpacity={1}
+                      fill="url(#colorSales)"
+                      name="Sales"
+                      isAnimationActive={true}
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </ChartContainer>
-
+          
+          {/* RESPONSIVE CHANGE: Changed md:col-span-2 to lg:col-span-3 to stack on tablets */}
           <ChartContainer
-            className="md:col-span-2 lg:col-span-3"
+            className="lg:col-span-3"
             title="Lead Pipeline"
             isDark={isDark}
             action={
@@ -827,11 +893,11 @@ const Dashboard = () => {
           </ChartContainer>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-6">
+        <div className="grid grid-cols-1 gap-6 mb-6">
+          {/* RESPONSIVE CHANGE: Full width on all screens for better mobile view */}
           <ChartContainer
             title="Daily Leads Added (Last 7 Days)"
             isDark={isDark}
-            className="md:col-span-4 lg:col-span-6"
           >
             {leadStatsLoading ? (
               <LoadingSpinner isDark={isDark} />
@@ -885,14 +951,15 @@ const Dashboard = () => {
             )}
           </ChartContainer>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-6">
+        
+        {/* RESPONSIVE CHANGE: Main grid for tables now stacks on medium screens */}
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-6 mb-6">
           <div
             className={`${
               isDark
                 ? "bg-gray-700 border-gray-600 text-gray-100"
                 : "bg-white border-gray-300 text-gray-900"
-            } rounded-xl shadow-sm border h-full md:col-span-3 lg:col-span-4`}
+            } rounded-xl shadow-sm border h-full lg:col-span-4`}
           >
             <div
               className={`p-6 border-b ${
@@ -911,8 +978,6 @@ const Dashboard = () => {
               </button>
             </div>
             <div className="overflow-x-auto">
-              {" "}
-              {/* Removed max-h-[400px] */}
               <table className="w-full">
                 <thead>
                   <tr
@@ -934,8 +999,9 @@ const Dashboard = () => {
                     >
                       Contact
                     </th>
+                    {/* RESPONSIVE CHANGE: Hide on mobile */}
                     <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      className={`hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
                         isDark ? "text-gray-300" : "text-gray-500"
                       }`}
                     >
@@ -948,8 +1014,9 @@ const Dashboard = () => {
                     >
                       Status
                     </th>
+                    {/* RESPONSIVE CHANGE: Hide on mobile and tablet */}
                     <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      className={`hidden lg:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
                         isDark ? "text-gray-300" : "text-gray-500"
                       }`}
                     >
@@ -980,6 +1047,7 @@ const Dashboard = () => {
                         >
                           {lead.company || lead.interest}
                         </div>
+
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm">{lead.email}</div>
@@ -991,14 +1059,16 @@ const Dashboard = () => {
                           {lead.phone}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      {/* RESPONSIVE CHANGE: Hide on mobile */}
+                      <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap">
                         <SourceBadge source={lead.source} isDark={isDark} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <StatusBadge status={lead.status} isDark={isDark} />
                       </td>
+                      {/* RESPONSIVE CHANGE: Hide on mobile and tablet */}
                       <td
-                        className={`px-6 py-4 whitespace-nowrap text-sm ${
+                        className={`hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm ${
                           isDark ? "text-gray-400" : "text-gray-500"
                         }`}
                       >
@@ -1015,7 +1085,7 @@ const Dashboard = () => {
               isDark
                 ? "bg-gray-700 border-gray-600 text-gray-100"
                 : "bg-white border-gray-300 text-gray-900"
-            } rounded-xl shadow-sm border h-full md:col-span-1 lg:col-span-2`}
+            } rounded-xl shadow-sm border h-full lg:col-span-2`}
           >
             <div
               className={`p-6 border-b ${
@@ -1091,9 +1161,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          {/* RESPONSIVE CHANGE: Charts stack on medium screens, side-by-side on large */}
           <ChartContainer
-            className="md:col-span-2 lg:col-span-3"
+            className="lg:col-span-2"
             title="Property Types"
             isDark={isDark}
             action={
@@ -1112,7 +1183,7 @@ const Dashboard = () => {
             ) : propertyError ? (
               <ErrorMessage error={propertyError} isDark={isDark} />
             ) : propertyTypeData.length > 0 ? (
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -1176,19 +1247,9 @@ const Dashboard = () => {
           </ChartContainer>
 
           <ChartContainer
-            className="md:col-span-2 lg:col-span-3"
+            className="md:col-span-1 lg:col-span-1"
             title="Lead Sources"
             isDark={isDark}
-            action={
-              <div
-                className={`flex items-center ${
-                  isDark ? "text-gray-400" : "text-gray-500"
-                }`}
-              >
-                <BarChart2 className="h-4 w-4 mr-1" />
-                <span className="text-xs">Distribution</span>
-              </div>
-            }
           >
             {leadStatsLoading && !animateLeadSources ? (
               <LoadingSpinner isDark={isDark} />
@@ -1245,14 +1306,15 @@ const Dashboard = () => {
             )}
           </ChartContainer>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-6">
+        
+        {/* RESPONSIVE CHANGE: Main grid for tables now stacks on medium screens */}
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-6 mb-6">
           <div
             className={`${
               isDark
                 ? "bg-gray-700 border-gray-600 text-gray-100"
                 : "bg-white border-gray-300 text-gray-900"
-            } rounded-xl shadow-sm p-6 border h-full md:col-span-3 lg:col-span-4`}
+            } rounded-xl shadow-sm p-6 border h-full lg:col-span-4`}
           >
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-bold">Builder Performance</h3>
@@ -1288,15 +1350,16 @@ const Dashboard = () => {
                     >
                       Leads
                     </th>
+                    {/* RESPONSIVE CHANGE: Hide on mobile */}
                     <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      className={`hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
                         isDark ? "text-gray-300" : "text-gray-500"
                       }`}
                     >
                       Site Visits
                     </th>
                     <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      className={`hidden md:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
                         isDark ? "text-gray-300" : "text-gray-500"
                       }`}
                     >
@@ -1309,8 +1372,9 @@ const Dashboard = () => {
                     >
                       Rate
                     </th>
+                    {/* RESPONSIVE CHANGE: Hide on mobile */}
                     <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      className={`hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
                         isDark ? "text-gray-300" : "text-gray-500"
                       }`}
                     >
@@ -1342,15 +1406,16 @@ const Dashboard = () => {
                       >
                         {item.leads}
                       </td>
+                      {/* RESPONSIVE CHANGE: Hide on mobile */}
                       <td
-                        className={`px-6 py-4 whitespace-nowrap ${
+                        className={`hidden sm:table-cell px-6 py-4 whitespace-nowrap ${
                           isDark ? "text-gray-300" : "text-gray-600"
                         } group-hover:font-medium`}
                       >
                         {item.visits}
                       </td>
                       <td
-                        className={`px-6 py-4 whitespace-nowrap ${
+                        className={`hidden md:table-cell px-6 py-4 whitespace-nowrap ${
                           isDark ? "text-gray-300" : "text-gray-600"
                         } group-hover:font-medium`}
                       >
@@ -1363,7 +1428,8 @@ const Dashboard = () => {
                       >
                         {item.rate}%
                       </td>
-                      <td className="px-6 py-4">
+                      {/* RESPONSIVE CHANGE: Hide on mobile */}
+                      <td className="hidden sm:table-cell px-6 py-4">
                         <div
                           className={`w-full rounded-full h-1.5 ${
                             isDark ? "bg-gray-600" : "bg-gray-100"
@@ -1387,7 +1453,7 @@ const Dashboard = () => {
               isDark
                 ? "bg-gray-700 border-gray-600 text-gray-100"
                 : "bg-white border-gray-300 text-gray-900"
-            } rounded-xl shadow-sm p-6 border transition-all hover:shadow-md h-full md:col-span-1 lg:col-span-2`}
+            } rounded-xl shadow-sm p-6 border transition-all hover:shadow-md h-full lg:col-span-2`}
           >
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-bold">Team Status</h3>
