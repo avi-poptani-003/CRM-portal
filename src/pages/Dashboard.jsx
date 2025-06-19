@@ -4,7 +4,7 @@ import siteVisitService from "../services/siteVisitService";
 import UserService from "../services/UserService";
 import { useTheme } from "../context/ThemeContext";
 import { useLeadStats } from "../hooks/useLeadStats";
-import leadService from "../services/leadService";
+import leadService from "../services/leadService"; // 
 import {
   BarChart,
   Bar,
@@ -62,49 +62,6 @@ const formatVisitDate = (dateString) => {
   });
 };
 
-const builderPerformanceData = [
-  {
-    name: "Green Valley Homes",
-    leads: 128,
-    visits: 87,
-    conversions: 43,
-    rate: 33.6,
-    color: "bg-blue-600",
-  },
-  {
-    name: "Urban Heights Tower",
-    leads: 95,
-    visits: 62,
-    conversions: 29,
-    rate: 30.5,
-    color: "bg-blue-500",
-  },
-  {
-    name: "Lakeside Villas",
-    leads: 76,
-    visits: 41,
-    conversions: 18,
-    rate: 23.7,
-    color: "bg-blue-400",
-  },
-  {
-    name: "Sunset Apartments",
-    leads: 112,
-    visits: 64,
-    conversions: 26,
-    rate: 23.2,
-    color: "bg-blue-400",
-  },
-  {
-    name: "Metro Business Park",
-    leads: 68,
-    visits: 29,
-    conversions: 12,
-    rate: 17.6,
-    color: "bg-blue-300",
-  },
-];
-
 const COLORS = [
   "#4285F4",
   "#34A853",
@@ -122,6 +79,7 @@ const formatCurrency = (value) =>
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(value);
+
 const formatDate = (dateString) => {
   if (!dateString) return "N/A";
   const date = new Date(dateString);
@@ -378,7 +336,7 @@ const Dashboard = () => {
   const [revenueData, setRevenueData] = useState([]);
   const [revenueLoading, setRevenueLoading] = useState(true);
   const [revenueError, setRevenueError] = useState(null);
-  const [revenueTimeRange, setRevenueTimeRange] = useState("year"); // State for revenue chart filter
+  const [revenueTimeRange, setRevenueTimeRange] = useState("year");
 
   const [upcomingVisits, setUpcomingVisits] = useState([]);
   const [visitsLoading, setVisitsLoading] = useState(true);
@@ -387,6 +345,10 @@ const Dashboard = () => {
   const [teamUsers, setTeamUsers] = useState([]);
   const [teamLoading, setTeamLoading] = useState(true);
   const [teamError, setTeamError] = useState(null);
+  
+  const [builderPerformance, setBuilderPerformance] = useState([]);
+  const [builderLoading, setBuilderLoading] = useState(true);
+  const [builderError, setBuilderError] = useState(null);
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [animateLeadPipeline, setAnimateLeadPipeline] = useState(false);
@@ -466,13 +428,31 @@ const Dashboard = () => {
     }
   }, []);
 
+  const fetchBuilderPerformance = useCallback(async () => {
+    try {
+      setBuilderLoading(true);
+      const data = await leadService.getBuilderPerformance();
+      const performanceWithColors = data.map(item => ({
+        ...item,
+        color: item.rate > 30 ? "bg-blue-600" : item.rate > 20 ? "bg-blue-500" : "bg-blue-400",
+      }));
+      setBuilderPerformance(performanceWithColors);
+      setBuilderError(null);
+    } catch (err) {
+      setBuilderError("Failed to load builder performance.");
+      console.error(err);
+    } finally {
+      setBuilderLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPropertiesData();
     fetchUpcomingVisits();
     fetchTeamUsers();
-  }, [fetchPropertiesData, fetchUpcomingVisits, fetchTeamUsers]);
+    fetchBuilderPerformance();
+  }, [fetchPropertiesData, fetchUpcomingVisits, fetchTeamUsers, fetchBuilderPerformance]);
 
-  // Refetch revenue data when the time range changes
   useEffect(() => {
     fetchRevenueData(revenueTimeRange);
   }, [revenueTimeRange, fetchRevenueData]);
@@ -545,7 +525,8 @@ const Dashboard = () => {
     fetchPropertiesData();
     fetchUpcomingVisits();
     fetchTeamUsers();
-    fetchRevenueData(revenueTimeRange); // Also refresh revenue data
+    fetchRevenueData(revenueTimeRange);
+    fetchBuilderPerformance();
   }, [
     refetchLeadStats,
     timeRange,
@@ -553,7 +534,8 @@ const Dashboard = () => {
     fetchPropertiesData,
     fetchUpcomingVisits,
     fetchTeamUsers,
-    fetchRevenueData
+    fetchRevenueData,
+    fetchBuilderPerformance
   ]);
 
   const chartConfig = useMemo(
@@ -585,7 +567,7 @@ const Dashboard = () => {
   const handleCopyCsv = () => {};
 
   const isOverallPageLoading =
-    leadStatsLoading || propertyLoading || visitsLoading || teamLoading;
+    leadStatsLoading || propertyLoading || visitsLoading || teamLoading || builderLoading;
 
   const totalLeadsChange = stats
     ? calculatePercentageChange(
@@ -641,7 +623,6 @@ const Dashboard = () => {
     >
       <Navbar />
       <div className="container mx-auto px-4 py-6">
-        {/* RESPONSIVE CHANGE: Added items-center for better alignment on mobile */ }
         <div className="flex flex-col md:flex-row justify-between items-center md:items-center mb-6 gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">
@@ -721,7 +702,6 @@ const Dashboard = () => {
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-6 gap-6 mb-6">
-          {/* RESPONSIVE CHANGE: Changed md:col-span-2 to lg:col-span-3 to stack on tablets */}
           <ChartContainer
             className="lg:col-span-3"
             title="Revenue Overview"
@@ -809,7 +789,6 @@ const Dashboard = () => {
             )}
           </ChartContainer>
           
-          {/* RESPONSIVE CHANGE: Changed md:col-span-2 to lg:col-span-3 to stack on tablets */}
           <ChartContainer
             className="lg:col-span-3"
             title="Lead Pipeline"
@@ -894,7 +873,6 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 gap-6 mb-6">
-          {/* RESPONSIVE CHANGE: Full width on all screens for better mobile view */}
           <ChartContainer
             title="Daily Leads Added (Last 7 Days)"
             isDark={isDark}
@@ -952,7 +930,6 @@ const Dashboard = () => {
           </ChartContainer>
         </div>
         
-        {/* RESPONSIVE CHANGE: Main grid for tables now stacks on medium screens */}
         <div className="grid grid-cols-1 lg:grid-cols-6 gap-6 mb-6">
           <div
             className={`${
@@ -999,7 +976,6 @@ const Dashboard = () => {
                     >
                       Contact
                     </th>
-                    {/* RESPONSIVE CHANGE: Hide on mobile */}
                     <th
                       className={`hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
                         isDark ? "text-gray-300" : "text-gray-500"
@@ -1014,7 +990,6 @@ const Dashboard = () => {
                     >
                       Status
                     </th>
-                    {/* RESPONSIVE CHANGE: Hide on mobile and tablet */}
                     <th
                       className={`hidden lg:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
                         isDark ? "text-gray-300" : "text-gray-500"
@@ -1059,14 +1034,12 @@ const Dashboard = () => {
                           {lead.phone}
                         </div>
                       </td>
-                      {/* RESPONSIVE CHANGE: Hide on mobile */}
                       <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap">
                         <SourceBadge source={lead.source} isDark={isDark} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <StatusBadge status={lead.status} isDark={isDark} />
                       </td>
-                      {/* RESPONSIVE CHANGE: Hide on mobile and tablet */}
                       <td
                         className={`hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm ${
                           isDark ? "text-gray-400" : "text-gray-500"
@@ -1162,7 +1135,6 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          {/* RESPONSIVE CHANGE: Charts stack on medium screens, side-by-side on large */}
           <ChartContainer
             className="lg:col-span-2"
             title="Property Types"
@@ -1307,7 +1279,6 @@ const Dashboard = () => {
           </ChartContainer>
         </div>
         
-        {/* RESPONSIVE CHANGE: Main grid for tables now stacks on medium screens */}
         <div className="grid grid-cols-1 lg:grid-cols-6 gap-6 mb-6">
           <div
             className={`${
@@ -1328,124 +1299,47 @@ const Dashboard = () => {
                 View All
               </button>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
-              <table className="w-full">
-                <thead>
-                  <tr
-                    className={`border-b ${
-                      isDark ? "border-gray-600" : "border-gray-300"
-                    }`}
-                  >
-                    <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        isDark ? "text-gray-300" : "text-gray-500"
-                      }`}
-                    >
-                      Project
-                    </th>
-                    <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        isDark ? "text-gray-300" : "text-gray-500"
-                      }`}
-                    >
-                      Leads
-                    </th>
-                    {/* RESPONSIVE CHANGE: Hide on mobile */}
-                    <th
-                      className={`hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        isDark ? "text-gray-300" : "text-gray-500"
-                      }`}
-                    >
-                      Site Visits
-                    </th>
-                    <th
-                      className={`hidden md:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        isDark ? "text-gray-300" : "text-gray-500"
-                      }`}
-                    >
-                      Conversions
-                    </th>
-                    <th
-                      className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        isDark ? "text-gray-300" : "text-gray-500"
-                      }`}
-                    >
-                      Rate
-                    </th>
-                    {/* RESPONSIVE CHANGE: Hide on mobile */}
-                    <th
-                      className={`hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                        isDark ? "text-gray-300" : "text-gray-500"
-                      }`}
-                    >
-                      Performance
-                    </th>
-                  </tr>
-                </thead>
-                <tbody
-                  className={`divide-y ${
-                    isDark ? "divide-gray-600" : "divide-gray-300"
-                  }`}
-                >
-                  {builderPerformanceData.map((item, idx) => (
-                    <tr
-                      key={idx}
-                      className={`${
-                        isDark ? "hover:bg-blue-900/20" : "hover:bg-blue-50"
-                      } cursor-pointer transition-all duration-200 group hover:shadow-sm`}
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap border-l-4 border-transparent group-hover:border-blue-500">
-                        <div className="font-medium group-hover:text-blue-500 transition-colors duration-200">
-                          {item.name}
-                        </div>
-                      </td>
-                      <td
-                        className={`px-6 py-4 whitespace-nowrap ${
-                          isDark ? "text-gray-300" : "text-gray-600"
-                        } group-hover:font-medium`}
-                      >
-                        {item.leads}
-                      </td>
-                      {/* RESPONSIVE CHANGE: Hide on mobile */}
-                      <td
-                        className={`hidden sm:table-cell px-6 py-4 whitespace-nowrap ${
-                          isDark ? "text-gray-300" : "text-gray-600"
-                        } group-hover:font-medium`}
-                      >
-                        {item.visits}
-                      </td>
-                      <td
-                        className={`hidden md:table-cell px-6 py-4 whitespace-nowrap ${
-                          isDark ? "text-gray-300" : "text-gray-600"
-                        } group-hover:font-medium`}
-                      >
-                        {item.conversions}
-                      </td>
-                      <td
-                        className={`px-6 py-4 whitespace-nowrap ${
-                          isDark ? "text-gray-300" : "text-gray-600"
-                        } group-hover:font-medium`}
-                      >
-                        {item.rate}%
-                      </td>
-                      {/* RESPONSIVE CHANGE: Hide on mobile */}
-                      <td className="hidden sm:table-cell px-6 py-4">
-                        <div
-                          className={`w-full rounded-full h-1.5 ${
-                            isDark ? "bg-gray-600" : "bg-gray-100"
-                          }`}
-                        >
-                          <div
-                            className={`${item.color} h-1.5 rounded-full transition-all duration-1000 ease-out group-hover:h-2.5 group-hover:shadow-md group-hover:shadow-blue-500/30`}
-                            style={{ width: `${item.rate}%` }}
-                          ></div>
-                        </div>
-                      </td>
+            {builderLoading ? (
+              <LoadingSpinner isDark={isDark} />
+            ) : builderError ? (
+              <ErrorMessage error={builderError} onRetry={fetchBuilderPerformance} isDark={isDark} />
+            ) : (
+              <div className="overflow-x-auto max-h-[400px]">
+                <table className="w-full">
+                  <thead>
+                    <tr className={`border-b ${isDark ? "border-gray-600" : "border-gray-300"}`}>
+                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? "text-gray-300" : "text-gray-500"}`}>Project</th>
+                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? "text-gray-300" : "text-gray-500"}`}>Leads</th>
+                      <th className={`hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? "text-gray-300" : "text-gray-500"}`}>Site Visits</th>
+                      <th className={`hidden md:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? "text-gray-300" : "text-gray-500"}`}>Conversions</th>
+                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? "text-gray-300" : "text-gray-500"}`}>Rate</th>
+                      <th className={`hidden sm:table-cell px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDark ? "text-gray-300" : "text-gray-500"}`}>Performance</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className={`divide-y ${isDark ? "divide-gray-600" : "divide-gray-300"}`}>
+                    {builderPerformance.map((item, idx) => (
+                      <tr key={idx} className={`${isDark ? "hover:bg-blue-900/20" : "hover:bg-blue-50"} cursor-pointer transition-all duration-200 group hover:shadow-sm`}>
+                        <td className="px-6 py-4 whitespace-nowrap border-l-4 border-transparent group-hover:border-blue-500">
+                          <div className="font-medium group-hover:text-blue-500 transition-colors duration-200">{item.title}</div>
+                        </td>
+                        <td className={`px-6 py-4 whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"} group-hover:font-medium`}>{item.leads}</td>
+                        <td className={`hidden sm:table-cell px-6 py-4 whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"} group-hover:font-medium`}>{item.visits}</td>
+                        <td className={`hidden md:table-cell px-6 py-4 whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"} group-hover:font-medium`}>{item.conversions}</td>
+                        <td className={`px-6 py-4 whitespace-nowrap ${isDark ? "text-gray-300" : "text-gray-600"} group-hover:font-medium`}>{item.rate.toFixed(1)}%</td>
+                        <td className="hidden sm:table-cell px-6 py-4">
+                          <div className={`w-full rounded-full h-1.5 ${isDark ? "bg-gray-600" : "bg-gray-100"}`}>
+                            <div
+                              className={`${item.color} h-1.5 rounded-full transition-all duration-1000 ease-out group-hover:h-2.5 group-hover:shadow-md group-hover:shadow-blue-500/30`}
+                              style={{ width: `${item.rate.toFixed(1)}%` }}
+                            ></div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <div

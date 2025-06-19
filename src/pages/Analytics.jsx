@@ -63,7 +63,6 @@ function Analytics() {
   const [leadSourceData, setLeadSourceData] = useState([])
   const [recentProperties, setRecentProperties] = useState([])
   
-  // --- ADD STATE FOR TEAM PERFORMANCE ---
   const [teamPerformanceData, setTeamPerformanceData] = useState([])
 
   const [isLoading, setIsLoading] = useState(true)
@@ -77,12 +76,35 @@ function Analytics() {
         const [properties, leadStats, teamPerformance] = await Promise.all([
           propertyService.getProperties(),
           leadService.getDashboardStats("year"),
-          leadService.getTeamPerformance(), // <-- Fetch team performance data
+          leadService.getTeamPerformance(),
         ])
         
-        setTeamPerformanceData(teamPerformance) // <-- Set the state
+        // --- FIX START: Process Team Performance Data ---
+        // This block processes the raw team performance data from the API
+        // to calculate the conversion rate and map the profile image URL correctly.
+        const processedTeamPerformance = teamPerformance.map(agent => {
+          // Calculate conversion rate.
+          // Assumes the API response for each agent includes 'deals' and 'total_leads'.
+          // If 'total_leads' is named differently in your API response (e.g., 'leads_assigned'),
+          // please update the field name below.
+          const conversionRate = agent.total_leads > 0 
+              ? (agent.deals / agent.total_leads) * 100 
+              : 0;
 
-        // --- (The rest of your existing data processing for properties and lead stats remains the same) ---
+          // Map the profile image URL.
+          // Assumes the API response provides the agent's image URL in a field called 'profile_url'.
+          // The component expects a field named 'avatar', so we are creating it here.
+          // Note: If 'profile_url' is a relative path, you may need to prepend your API's base URL.
+          return {
+              ...agent,
+              avatar: agent.profile_url, 
+              conversionRate: parseFloat(conversionRate.toFixed(1)),
+          };
+        });
+        setTeamPerformanceData(processedTeamPerformance) // <-- Set the processed data
+        // --- FIX END ---
+
+
         // --- Process Property Data ---
         const typeCounts = properties.reduce((acc, property) => {
           const type = property.property_type || "Other"

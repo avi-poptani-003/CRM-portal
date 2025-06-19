@@ -230,6 +230,17 @@ const LeadService = {
     }
   },
 
+  getBuilderPerformance: async () => {
+    try {
+      const response = await api.get("/leads/builder_performance/");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching builder performance data:", error);
+      throw error;
+    }
+  },
+
+
   getApiInstance: () => api,
 };
 
